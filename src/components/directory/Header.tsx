@@ -14,9 +14,10 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useTheme } from 'next-themes';
 import {
   Menu, Search, MapPin, LogIn, UserPlus, LayoutDashboard, LogOut, ChevronDown,
-  Home, Compass, FolderOpen, Map, X,
+  Home, Compass, FolderOpen, Map, X, Sun, Moon,
 } from 'lucide-react';
 import type { Category, Locality } from '@/types';
 
@@ -30,6 +31,7 @@ export function Header() {
   const [localities, setLocalities] = useState<Locality[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -122,6 +124,16 @@ export function Header() {
                   {link.label}
                 </Button>
               ))}
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className={`pointer-events-auto relative ${isTransparent ? 'text-white hover:text-white hover:bg-white/15' : ''}`}
+                aria-label="Toggle theme"
+              >
+                {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </Button>
 
               {!isAuthenticated ? (
                 <div className="flex items-center gap-2 ml-2">
@@ -326,6 +338,19 @@ export function Header() {
               </button>
             ))}
           </nav>
+
+          <Separator className="my-4" />
+
+          {/* Theme Toggle in Sheet */}
+          <div className="px-2 mb-2">
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-accent transition-colors text-foreground"
+            >
+              {resolvedTheme === 'dark' ? <Sun className="h-5 w-5 text-amber-500" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
+              {resolvedTheme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            </button>
+          </div>
 
           <Separator className="my-4" />
 

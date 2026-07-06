@@ -9,7 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Search, ArrowRight, Star, CheckCircle2, Building2, Train, Plane, Droplets,
   TreePine, Utensils, Hotel, Hospital, GraduationCap, ShoppingBag, Landmark, Car, Dumbbell, MapPin,
-  TrendingUp, Users, FolderOpen, BarChart3, Flame,
+  TrendingUp, Users, FolderOpen, Flame, Search as SearchIcon, ClipboardList, Phone,
+  LayoutGrid, Sparkles, MapPinIcon, MessageSquareQuote, Quote,
 } from 'lucide-react';
 import type { Category, Locality, Business, BusinessWithRelations } from '@/types';
 import { api } from '@/lib/api';
@@ -36,6 +37,45 @@ const TRENDING_SEARCHES = [
   { term: 'Car Services', icon: Car, searches: '650' },
 ];
 
+const HOW_IT_WORKS_STEPS = [
+  {
+    num: 1,
+    title: 'Search',
+    description: 'Find businesses by category, locality, or keyword',
+    icon: SearchIcon,
+  },
+  {
+    num: 2,
+    title: 'Compare',
+    description: 'View details, products, services, and reviews',
+    icon: ClipboardList,
+  },
+  {
+    num: 3,
+    title: 'Connect',
+    description: 'Send enquiries and chat directly with businesses',
+    icon: Phone,
+  },
+];
+
+const TESTIMONIALS = [
+  {
+    quote: 'CityDir helped me find the perfect venue for our corporate event. The enquiry system made it so easy!',
+    name: 'Priya Sharma',
+    role: 'Event Planner',
+  },
+  {
+    quote: 'As a small business owner, listing on CityDir has brought us dozens of new customers every month.',
+    name: 'Rajesh Kumar',
+    role: 'Restaurant Owner',
+  },
+  {
+    quote: 'I love how I can find everything from hospitals to swimming pools in one place. Super convenient!',
+    name: 'Anita Desai',
+    role: 'Homemaker',
+  },
+];
+
 export function HomePage() {
   const { setView, searchQuery, setSearchQuery, categories, localities } = useAppStore();
   const [featured, setFeatured] = useState<BusinessWithRelations[]>([]);
@@ -60,6 +100,15 @@ export function HomePage() {
       {/* Hero Section */}
       <section className="gradient-hero relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.08),transparent_60%)]" />
+
+        {/* Floating shapes */}
+        <div className="absolute top-16 left-[8%] w-16 h-16 rounded-full bg-white/5 animate-[float_6s_ease-in-out_infinite]" />
+        <div className="absolute top-32 right-[12%] w-24 h-24 rounded-2xl bg-white/[0.07] animate-[float-reverse_7s_ease-in-out_infinite_0.5s]" />
+        <div className="absolute bottom-40 left-[18%] w-10 h-10 rounded-full bg-white/10 animate-[float_4.5s_ease-in-out_infinite_1s]" />
+        <div className="absolute top-48 right-[30%] w-32 h-32 rounded-full bg-white/[0.04] animate-[float-reverse_8s_ease-in-out_infinite_0.3s]" />
+        <div className="absolute bottom-24 right-[8%] w-20 h-20 rounded-xl bg-white/[0.06] animate-[float_5.5s_ease-in-out_infinite_1.5s]" />
+        <div className="absolute top-20 left-[45%] w-12 h-12 rounded-full bg-white/[0.08] animate-[float-reverse_6.5s_ease-in-out_infinite_0.8s]" />
+
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36">
           <div className="text-center max-w-3xl mx-auto">
             <Badge className="mb-4 bg-white/15 text-white border-white/20 backdrop-blur-sm hover:bg-white/20">
@@ -139,12 +188,45 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* How It Works Section */}
       <section className="py-12 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-4">
+              <Sparkles className="h-3.5 w-3.5" /> How It Works
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Find What You Need in 3 Steps</h2>
+            <p className="mt-2 text-muted-foreground text-lg">Simple, fast, and effective</p>
+          </div>
+          <div className="relative grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4 max-w-4xl mx-auto">
+            {/* Connecting line (desktop only) */}
+            <div className="hidden md:block absolute top-[3.5rem] left-[calc(16.67%+1.5rem)] right-[calc(16.67%+1.5rem)] h-0.5 bg-gradient-to-r from-primary/30 via-primary/50 to-primary/30" />
+
+            {HOW_IT_WORKS_STEPS.map((step) => (
+              <div key={step.num} className="relative flex flex-col items-center text-center">
+                <div className="relative z-10 w-16 h-16 rounded-full bg-gradient-to-br from-primary to-teal-400 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/25 mb-5">
+                  {step.num}
+                </div>
+                <div className="p-3 rounded-xl bg-primary/10 text-primary mb-3">
+                  <step.icon className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-bold text-foreground mb-1">{step.title}</h3>
+                <p className="text-sm text-muted-foreground max-w-[240px]">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Categories Section */}
+      <section className="py-12 sm:py-20 bg-muted/40">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Browse by Category</h2>
-            <p className="mt-2 text-muted-foreground text-lg">Find exactly what you need</p>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-4">
+              <LayoutGrid className="h-3.5 w-3.5" /> Browse by Category
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Find What You&apos;re Looking For</h2>
+            <p className="mt-2 text-muted-foreground text-lg">Explore businesses across every category</p>
           </div>
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -187,16 +269,14 @@ export function HomePage() {
       </section>
 
       {/* Featured Businesses */}
-      <section className="py-12 sm:py-20 bg-muted/40">
+      <section className="py-12 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-10">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Featured Places</h2>
-              <p className="mt-2 text-muted-foreground text-lg">Top rated & verified listings</p>
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-4">
+              <Star className="h-3.5 w-3.5" /> Featured Places
             </div>
-            <Button variant="outline" className="hidden sm:flex" onClick={() => setView('browse')}>
-              View All <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Top Rated & Verified Listings</h2>
+            <p className="mt-2 text-muted-foreground text-lg">Handpicked businesses trusted by the community</p>
           </div>
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -211,7 +291,7 @@ export function HomePage() {
               ))}
             </div>
           )}
-          <div className="text-center mt-8 sm:hidden">
+          <div className="text-center mt-8">
             <Button variant="outline" onClick={() => setView('browse')}>
               View All <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
@@ -220,16 +300,14 @@ export function HomePage() {
       </section>
 
       {/* Trending Searches */}
-      <section className="py-12 sm:py-20">
+      <section className="py-12 sm:py-20 bg-muted/40">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-2 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
-              <Flame className="h-5 w-5" />
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 text-xs font-medium mb-4">
+              <Flame className="h-3.5 w-3.5" /> Trending Searches
             </div>
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Trending Searches</h2>
-              <p className="text-sm text-muted-foreground">What people are looking for right now</p>
-            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">What People Are Looking For</h2>
+            <p className="mt-2 text-muted-foreground text-lg">Popular searches right now</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 stagger-children">
             {TRENDING_SEARCHES.map((item) => (
@@ -255,11 +333,14 @@ export function HomePage() {
       </section>
 
       {/* Localities Section */}
-      <section className="py-12 sm:py-20 bg-muted/40">
+      <section className="py-12 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Explore by Area</h2>
-            <p className="mt-2 text-muted-foreground text-lg">Discover what&apos;s near you</p>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-4">
+              <MapPinIcon className="h-3.5 w-3.5" /> Explore by Area
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Discover What&apos;s Near You</h2>
+            <p className="mt-2 text-muted-foreground text-lg">Browse businesses by locality</p>
           </div>
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -287,11 +368,53 @@ export function HomePage() {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+      <section className="py-12 sm:py-20 bg-muted/40">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-4">
+              <MessageSquareQuote className="h-3.5 w-3.5" /> What People Say
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Loved by Our Community</h2>
+            <p className="mt-2 text-muted-foreground text-lg">Real stories from real users</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger-children max-w-5xl mx-auto">
+            {TESTIMONIALS.map((t) => (
+              <Card key={t.name} className="relative border-border/50 hover:shadow-lg transition-shadow duration-200">
+                <CardContent className="p-6">
+                  <Quote className="h-8 w-8 text-primary/20 mb-3" />
+                  <p className="text-sm sm:text-base text-foreground/80 leading-relaxed mb-5">
+                    &ldquo;{t.quote}&rdquo;
+                  </p>
+                  <div className="flex items-center gap-0.5 mb-4">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-teal-400 flex items-center justify-center text-white font-bold text-sm">
+                      {t.name.split(' ').map((n) => n[0]).join('')}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm text-foreground">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.role}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-12 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="gradient-hero rounded-3xl p-8 sm:p-12 lg:p-16 text-center relative overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(255,255,255,0.06),transparent_60%)]" />
+            {/* Floating shapes in CTA */}
+            <div className="absolute top-8 left-[10%] w-16 h-16 rounded-full bg-white/5 animate-[float_5s_ease-in-out_infinite]" />
+            <div className="absolute bottom-8 right-[15%] w-20 h-20 rounded-xl bg-white/[0.06] animate-[float-reverse_6s_ease-in-out_infinite_0.5s]" />
             <div className="relative">
               <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
                 List Your Business on CityDir

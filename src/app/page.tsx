@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { ThemeProvider } from 'next-themes';
 import { useAppStore } from '@/store/app-store';
 import { api } from '@/lib/api';
 import { Header } from '@/components/directory/Header';
@@ -61,9 +62,9 @@ function AppContent() {
 
 export default function Page() {
   return (
-    <>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
       <AppContent />
       <Toaster position="top-right" richColors closeButton />
-    </>
+    </ThemeProvider>
   );
 }

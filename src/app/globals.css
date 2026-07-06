@@ -156,6 +156,16 @@
   to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(5deg); }
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(20px) rotate(-5deg); }
+}
+
 .animate-fade-in {
   animation: fade-in 0.4s ease-out;
 }
@@ -211,3 +221,36 @@
 .gradient-card-6 { background: linear-gradient(135deg, #065f46 0%, #047857 100%); }
 .gradient-card-7 { background: linear-gradient(135deg, #134e4a 0%, #0f766e 100%); }
 .gradient-card-8 { background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); }
+
+/* Theme transition */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
+/* Typing indicator animation */
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+.typing-dot {
+  animation: typing-bounce 1.4s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Sticky table header */
+.sticky-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--card);
+}
