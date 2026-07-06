@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  role      String   @default("VISITOR") // ADMIN, BUSINESS_OWNER, VISITOR
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businesses   Business[]
+  enquiries    Enquiry[]
+  sentMessages Message[] @relation("MessageSender")
+}
+
+model Category {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  icon        String?
+  description String?
+  isActive    Boolean     @default(true)
+  order       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  businesses Business[]
+}
+
+model Locality {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  description String?
+  isActive    Boolean     @default(true)
+  order       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  businesses Business[]
+}
+
+model Business {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  type        String     @default("BUSINESS") // BUSINESS, AMENITY
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  lat         Float?
+  lng         Float?
+  logo        String?
+  coverImage  String?
+  rating      Float      @default(0)
+  isVerified  Boolean    @default(false)
+  isFeatured  Boolean    @default(false)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  categoryId  String
+  localityId  String
+
+  category   Category  @relation(fields: [categoryId], references: [id])
+  locality   Locality  @relation(fields: [localityId], references: [id])
+  owner      User?     @relation(fields: [ownerId], references: [id])
+  ownerId    String?
+  products   Product[]
+  enquiries  Enquiry[]
+
+  @@index([categoryId])
+  @@index([localityId])
+  @@index([type])
+  @@index([slug])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       String?
+  image       String?
+  type        String   @default("PRODUCT") // PRODUCT, SERVICE
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+model Enquiry {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  message     String
+  status      String   @default("OPEN") // OPEN, IN_PROGRESS, CLOSED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  businessId String
+  visitorId  String
+  business   Business @relation(fields: [businessId], references: [id])
+  visitor    User     @relation(fields: [visitorId], references: [id])
+  messages   Message[]
+
+  @@index([businessId])
+  @@index([visitorId])
+  @@index([status])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  content    String
+  createdAt  DateTime @default(now())
+
+  enquiryId String
+  enquiry   Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User    @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@index([enquiryId])
+}
