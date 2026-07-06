@@ -14,8 +14,15 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   ArrowLeft, MapPin, Phone, Mail, Globe, Star, CheckCircle2, Clock,
-  Package, Wrench, Send, ShieldCheck, ExternalLink,
+  Package, Wrench, Send, ShieldCheck, ExternalLink, Share2, MapPinned,
+  Home, ChevronRight, PackageOpen,
 } from 'lucide-react';
 import type { BusinessWithRelations, Enquiry } from '@/types';
 
@@ -104,6 +111,19 @@ export function BusinessDetailPage() {
     setView('browse');
   };
 
+  const handleShare = () => {
+    const url = `${window.location.origin}?biz=${selectedBusinessId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success('Link copied to clipboard!');
+    }).catch(() => {
+      toast.error('Failed to copy link');
+    });
+  };
+
+  const handleViewOnMap = () => {
+    toast.info('Map integration coming soon!', { description: 'We\'re working on adding interactive maps.' });
+  };
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
@@ -134,16 +154,18 @@ export function BusinessDetailPage() {
   const products = business.products?.filter((p) => p.isActive) || [];
   const productItems = products.filter((p) => p.type === 'PRODUCT');
   const serviceItems = products.filter((p) => p.type === 'SERVICE');
+  const isAmenity = business.type === 'AMENITY';
 
   return (
     <div className="animate-fade-in">
-      {/* Cover */}
-      <div className="gradient-hero relative h-48 sm:h-64">
+      {/* Cover - dynamic gradient based on type */}
+      <div className={`relative h-48 sm:h-64 ${isAmenity ? 'gradient-cover-amenity' : 'gradient-cover-business'}`}>
         <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]" />
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-white/15 text-[120px] sm:text-[180px] font-black select-none">{business.name.charAt(0)}</span>
         </div>
-        <div className="absolute top-4 left-4 z-10">
+        <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
           <Button
             variant="secondary"
             size="sm"
@@ -153,14 +175,65 @@ export function BusinessDetailPage() {
             <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
           </Button>
         </div>
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="bg-white/90 backdrop-blur-sm hover:bg-white shadow-lg"
+                  onClick={handleShare}
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Share this business</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="bg-white/90 backdrop-blur-sm hover:bg-white shadow-lg"
+                  onClick={handleViewOnMap}
+                >
+                  <MapPinned className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>View on Map</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-10">
+      {/* Breadcrumbs */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <nav className="flex items-center gap-1.5 text-sm py-4 text-muted-foreground" aria-label="Breadcrumb">
+          <button
+            onClick={() => setView('home')}
+            className="hover:text-foreground transition-colors flex items-center gap-1"
+          >
+            <Home className="h-3.5 w-3.5" /> Home
+          </button>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          <button
+            onClick={() => { setView('browse', undefined, business.categoryId); }}
+            className="hover:text-foreground transition-colors truncate max-w-[200px]"
+          >
+            {business.category?.name}
+          </button>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          <span className="text-foreground font-medium truncate max-w-[300px]">{business.name}</span>
+        </nav>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 relative z-10">
         {/* Main Info Card */}
         <Card className="border-0 shadow-xl mb-8">
           <CardContent className="p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row gap-6">
-              <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl gradient-card-2 flex items-center justify-center shrink-0`}>
+              <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ${isAmenity ? 'gradient-card-3' : 'gradient-card-2'} flex items-center justify-center shrink-0`}>
                 <span className="text-white/50 text-4xl sm:text-5xl font-black select-none">{business.name.charAt(0)}</span>
               </div>
               <div className="flex-1 min-w-0">
@@ -172,14 +245,14 @@ export function BusinessDetailPage() {
                     </Badge>
                   )}
                   {business.isFeatured && (
-                    <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/20 gap-1 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30">
+                    <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/20 gap-1 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30 animate-pulse-glow">
                       <Star className="h-3.5 w-3.5" /> Featured
                     </Badge>
                   )}
                   <Badge variant="outline" className={
-                    business.type === 'AMENITY' ? 'border-amber-500/30 text-amber-700 dark:text-amber-400' : 'border-primary/30 text-primary'
+                    isAmenity ? 'border-amber-500/30 text-amber-700 dark:text-amber-400' : 'border-primary/30 text-primary'
                   }>
-                    {business.type === 'AMENITY' ? 'Amenity' : 'Business'}
+                    {isAmenity ? 'Amenity' : 'Business'}
                   </Badge>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -254,6 +327,41 @@ export function BusinessDetailPage() {
               </CardContent>
             </Card>
 
+            {/* Operating Hours */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" /> Operating Hours
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Monday - Saturday</span>
+                  <span className="font-medium">9:00 AM - 8:00 PM</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Sunday</span>
+                  <span className="font-medium">10:00 AM - 6:00 PM</span>
+                </div>
+                <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Open now
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* View on Map */}
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={handleViewOnMap}
+            >
+              <MapPinned className="h-4 w-4 text-primary" />
+              View on Map
+              <span className="ml-auto text-xs text-muted-foreground">Coming Soon</span>
+            </Button>
+
             {/* Quick Enquiry */}
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader className="pb-3">
@@ -313,9 +421,12 @@ export function BusinessDetailPage() {
 
               <TabsContent value="products" className="mt-6">
                 {products.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p>No products or services listed yet.</p>
+                  <div className="text-center py-16 text-muted-foreground">
+                    <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                      <PackageOpen className="h-8 w-8 text-muted-foreground/40" />
+                    </div>
+                    <p className="font-medium">No products or services listed yet.</p>
+                    <p className="text-sm text-muted-foreground/70 mt-1">Check back later for updates.</p>
                   </div>
                 ) : (
                   <>
@@ -323,18 +434,23 @@ export function BusinessDetailPage() {
                       <div className="mb-8">
                         <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
                           <Package className="h-5 w-5 text-primary" /> Products
+                          <Badge variant="secondary" className="text-xs font-normal">{productItems.length}</Badge>
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-children">
                           {productItems.map((p) => (
-                            <Card key={p.id} className="overflow-hidden">
-                              <div className={`h-28 ${getGradient(p.id)} flex items-center justify-center`}>
-                                <Package className="h-10 w-10 text-white/30" />
+                            <Card key={p.id} className="overflow-hidden group hover:shadow-lg transition-shadow duration-200 shimmer-effect">
+                              <div className={`relative h-28 ${getGradient(p.id)} flex items-center justify-center`}>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                <Package className="h-10 w-10 text-white/30 relative z-10" />
+                                <Badge className="absolute top-2.5 left-2.5 bg-white/20 text-white border-white/20 backdrop-blur-sm text-[10px]">
+                                  Product
+                                </Badge>
                               </div>
-                              <CardContent className="p-4">
-                                <h4 className="font-semibold">{p.name}</h4>
-                                {p.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{p.description}</p>}
+                              <CardContent className="p-4 pt-5">
+                                <h4 className="font-semibold group-hover:text-primary transition-colors">{p.name}</h4>
+                                {p.description && <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{p.description}</p>}
                                 {p.price && (
-                                  <p className="text-primary font-bold mt-2">{p.price}</p>
+                                  <p className="text-primary font-bold mt-3 text-lg">{p.price}</p>
                                 )}
                               </CardContent>
                             </Card>
@@ -346,18 +462,23 @@ export function BusinessDetailPage() {
                       <div>
                         <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
                           <Wrench className="h-5 w-5 text-primary" /> Services
+                          <Badge variant="secondary" className="text-xs font-normal">{serviceItems.length}</Badge>
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-children">
                           {serviceItems.map((s) => (
-                            <Card key={s.id} className="overflow-hidden">
-                              <div className={`h-28 ${getGradient(s.id)} flex items-center justify-center`}>
-                                <Wrench className="h-10 w-10 text-white/30" />
+                            <Card key={s.id} className="overflow-hidden group hover:shadow-lg transition-shadow duration-200 shimmer-effect">
+                              <div className={`relative h-28 ${getGradient(s.id)} flex items-center justify-center`}>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                <Wrench className="h-10 w-10 text-white/30 relative z-10" />
+                                <Badge className="absolute top-2.5 left-2.5 bg-white/20 text-white border-white/20 backdrop-blur-sm text-[10px]">
+                                  Service
+                                </Badge>
                               </div>
-                              <CardContent className="p-4">
-                                <h4 className="font-semibold">{s.name}</h4>
-                                {s.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{s.description}</p>}
+                              <CardContent className="p-4 pt-5">
+                                <h4 className="font-semibold group-hover:text-primary transition-colors">{s.name}</h4>
+                                {s.description && <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{s.description}</p>}
                                 {s.price && (
-                                  <p className="text-primary font-bold mt-2">{s.price}</p>
+                                  <p className="text-primary font-bold mt-3 text-lg">{s.price}</p>
                                 )}
                               </CardContent>
                             </Card>
@@ -390,7 +511,7 @@ export function BusinessDetailPage() {
                       </div>
                       <div>
                         <p className="text-muted-foreground">Type</p>
-                        <p className="font-medium mt-0.5">{business.type === 'AMENITY' ? 'Amenity' : 'Business'}</p>
+                        <p className="font-medium mt-0.5">{isAmenity ? 'Amenity' : 'Business'}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Listed Since</p>

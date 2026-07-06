@@ -10,7 +10,7 @@ import {
   Search, ArrowRight, Star, CheckCircle2, Building2, Train, Plane, Droplets,
   TreePine, Utensils, Hotel, Hospital, GraduationCap, ShoppingBag, Landmark, Car, Dumbbell, MapPin,
   TrendingUp, Users, FolderOpen, Flame, Search as SearchIcon, ClipboardList, Phone,
-  LayoutGrid, Sparkles, MapPinIcon, MessageSquareQuote, Quote,
+  LayoutGrid, Sparkles, MapPinIcon, MessageSquareQuote, Quote, ChevronDown, ArrowUp,
 } from 'lucide-react';
 import type { Category, Locality, Business, BusinessWithRelations } from '@/types';
 import { api } from '@/lib/api';
@@ -20,6 +20,22 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   Utensils, Hotel, Hospital, GraduationCap, ShoppingBag, Landmark, Train, Dumbbell,
   Building2, Plane, Droplets, TreePine, Car, MapPin, Star, CheckCircle2,
 };
+
+// Unique gradient classes per category index for visual variety
+const CATEGORY_GRADIENTS = [
+  { bg: 'bg-gradient-to-br from-teal-500 to-teal-600', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-emerald-500 to-emerald-600', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-cyan-600 to-cyan-700', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-green-500 to-green-600', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-amber-500 to-amber-600', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-orange-500 to-orange-600', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-rose-500 to-rose-600', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-violet-500 to-violet-600', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-pink-500 to-pink-600', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-lime-600 to-lime-700', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-sky-500 to-sky-600', icon: 'text-white' },
+  { bg: 'bg-gradient-to-br from-fuchsia-500 to-fuchsia-600', icon: 'text-white' },
+];
 
 const GRADIENT_CLASSES = [
   'gradient-card-1', 'gradient-card-2', 'gradient-card-3', 'gradient-card-4',
@@ -63,23 +79,33 @@ const TESTIMONIALS = [
     quote: 'CityDir helped me find the perfect venue for our corporate event. The enquiry system made it so easy!',
     name: 'Priya Sharma',
     role: 'Event Planner',
+    avatar: 'PS',
   },
   {
     quote: 'As a small business owner, listing on CityDir has brought us dozens of new customers every month.',
     name: 'Rajesh Kumar',
     role: 'Restaurant Owner',
+    avatar: 'RK',
   },
   {
     quote: 'I love how I can find everything from hospitals to swimming pools in one place. Super convenient!',
     name: 'Anita Desai',
     role: 'Homemaker',
+    avatar: 'AD',
   },
+];
+
+const STATS = [
+  { value: '500+', label: 'Businesses', icon: Building2 },
+  { value: '50+', label: 'Categories', icon: FolderOpen },
+  { value: '10K+', label: 'Users', icon: Users },
 ];
 
 export function HomePage() {
   const { setView, searchQuery, setSearchQuery, categories, localities } = useAppStore();
   const [featured, setFeatured] = useState<BusinessWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,9 +116,22 @@ export function HomePage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Back to top visibility
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 600);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) setView('browse');
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -158,6 +197,21 @@ export function HomePage() {
               ))}
             </div>
           </div>
+
+          {/* Scroll Down Indicator */}
+          <div className="absolute bottom-8 left-1/2 animate-bounce-down">
+            <button
+              onClick={() => {
+                const el = document.getElementById('stats-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="flex flex-col items-center gap-1 text-white/40 hover:text-white/70 transition-colors"
+              aria-label="Scroll down"
+            >
+              <span className="text-xs font-medium">Explore</span>
+              <ChevronDown className="h-5 w-5" />
+            </button>
+          </div>
         </div>
         {/* Wave bottom */}
         <div className="absolute bottom-0 left-0 right-0">
@@ -168,19 +222,15 @@ export function HomePage() {
       </section>
 
       {/* Stats Bar */}
-      <section className="py-10 sm:py-12 -mt-2">
+      <section id="stats-section" className="py-10 sm:py-12 -mt-2">
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
           <div className="grid grid-cols-3 gap-4 sm:gap-8">
-            {[
-              { value: '500+', label: 'Businesses', icon: Building2 },
-              { value: '50+', label: 'Categories', icon: FolderOpen },
-              { value: '10K+', label: 'Users', icon: Users },
-            ].map((stat) => (
+            {STATS.map((stat) => (
               <div key={stat.label} className="text-center group">
                 <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 text-primary mb-3 group-hover:scale-110 transition-transform duration-200">
                   <stat.icon className="h-6 w-6 sm:h-7 sm:w-7" />
                 </div>
-                <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">{stat.value}</p>
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground counter-value">{stat.value}</p>
                 <p className="text-sm text-muted-foreground mt-0.5">{stat.label}</p>
               </div>
             ))}
@@ -238,18 +288,19 @@ export function HomePage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 stagger-children">
               {categories.map((cat, idx) => {
                 const IconComp = CATEGORY_ICONS[cat.icon || 'Building2'] || Building2;
+                const gradient = CATEGORY_GRADIENTS[idx % CATEGORY_GRADIENTS.length];
                 return (
                   <Card
                     key={cat.id}
-                    className="group cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 border-border/50"
+                    className="group cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-200 border-border/50 shimmer-effect"
                     onClick={() => setView('browse', undefined, cat.id)}
                   >
                     <CardContent className="p-5 flex flex-col items-center text-center gap-3">
-                      <div className={`p-3 rounded-xl text-white ${GRADIENT_CLASSES[idx % GRADIENT_CLASSES.length]}`}>
-                        <IconComp className="h-6 w-6" />
+                      <div className={`p-3 rounded-xl ${gradient.bg} group-hover:scale-110 transition-transform duration-200`}>
+                        <IconComp className={`h-6 w-6 ${gradient.icon}`} />
                       </div>
                       <div>
-                        <p className="font-semibold text-sm">{cat.name}</p>
+                        <p className="font-semibold text-sm group-hover:text-primary transition-colors">{cat.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {cat._count?.businesses || 0} listings
                         </p>
@@ -350,16 +401,19 @@ export function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 stagger-children">
-              {localities.map((loc) => (
+              {localities.map((loc, idx) => (
                 <Card
                   key={loc.id}
-                  className="group cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden border-border/50"
+                  className="group cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border-border/50 shimmer-effect"
                   onClick={() => setView('browse', undefined, undefined, loc.id)}
                 >
-                  <div className="gradient-hero p-5 h-full flex flex-col justify-end">
-                    <MapPin className="h-5 w-5 text-white/60 mb-2" />
-                    <p className="font-bold text-white text-lg">{loc.name}</p>
-                    <p className="text-sm text-white/70">{loc._count?.businesses || 0} places</p>
+                  <div className={`${GRADIENT_CLASSES[idx % GRADIENT_CLASSES.length]} p-5 h-full flex flex-col justify-end relative`}>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                    <div className="relative z-10">
+                      <MapPin className="h-5 w-5 text-white/60 mb-2 group-hover:translate-x-0.5 transition-transform duration-200" />
+                      <p className="font-bold text-white text-lg group-hover:text-white/90 transition-colors">{loc.name}</p>
+                      <p className="text-sm text-white/70">{loc._count?.businesses || 0} places</p>
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -379,10 +433,16 @@ export function HomePage() {
             <p className="mt-2 text-muted-foreground text-lg">Real stories from real users</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger-children max-w-5xl mx-auto">
-            {TESTIMONIALS.map((t) => (
-              <Card key={t.name} className="relative border-border/50 hover:shadow-lg transition-shadow duration-200">
+            {TESTIMONIALS.map((t, idx) => (
+              <Card key={t.name} className="relative border-border/50 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+                {/* Subtle gradient top border */}
+                <div className={`h-1 ${GRADIENT_CLASSES[idx % GRADIENT_CLASSES.length]}`} />
                 <CardContent className="p-6">
-                  <Quote className="h-8 w-8 text-primary/20 mb-3" />
+                  {/* Large decorative quote mark */}
+                  <div className="relative mb-2">
+                    <Quote className="h-14 w-14 text-primary/[0.08] absolute -top-3 -left-1" />
+                    <Quote className="h-6 w-6 text-primary/15 relative z-10" />
+                  </div>
                   <p className="text-sm sm:text-base text-foreground/80 leading-relaxed mb-5">
                     &ldquo;{t.quote}&rdquo;
                   </p>
@@ -392,8 +452,8 @@ export function HomePage() {
                     ))}
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-teal-400 flex items-center justify-center text-white font-bold text-sm">
-                      {t.name.split(' ').map((n) => n[0]).join('')}
+                    <div className={`w-10 h-10 rounded-full ${GRADIENT_CLASSES[(idx + 2) % GRADIENT_CLASSES.length]} flex items-center justify-center text-white font-bold text-sm`}>
+                      {t.avatar}
                     </div>
                     <div>
                       <p className="font-semibold text-sm text-foreground">{t.name}</p>
@@ -443,6 +503,15 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Back to Top Button */}
+      <button
+        onClick={scrollToTop}
+        className={`back-to-top fixed bottom-6 right-6 z-50 w-11 h-11 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-105 flex items-center justify-center transition-all duration-200 ${showBackToTop ? 'visible' : 'hidden'}`}
+        aria-label="Back to top"
+      >
+        <ArrowUp className="h-5 w-5" />
+      </button>
     </div>
   );
 }

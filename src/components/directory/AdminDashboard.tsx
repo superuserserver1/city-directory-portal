@@ -73,8 +73,8 @@ export function AdminDashboard() {
     setLoading(true);
     fetchData()
       .then(({ s, c, l, b, u, eq }) => {
-        setStats(s); setCategories(c); setLocalities(l);
-        setBusinesses(b.businesses || []); setUsers(u); setEnquiries(eq);
+        setStats(s); setCategories(c.categories || []); setLocalities(l.localities || []);
+        setBusinesses(b.businesses || []); setUsers(u.users || []); setEnquiries(eq.enquiries || []);
       })
       .catch(() => toast.error('Failed to load dashboard'))
       .finally(() => setLoading(false));

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { useTheme } from 'next-themes';
 import {
   Menu, Search, MapPin, LogIn, UserPlus, LayoutDashboard, LogOut, ChevronDown,
-  Home, Compass, FolderOpen, Map, X, Sun, Moon,
+  Home, Compass, FolderOpen, Map, X, Sun, Moon, Bell, User,
 } from 'lucide-react';
 import type { Category, Locality } from '@/types';
 
@@ -26,31 +26,27 @@ export function Header() {
     currentView, user, isAuthenticated, searchQuery,
     setView, setSearchQuery, logout, toggleMobileMenu,
   } = useAppStore();
-  const [scrolled, setScrolled] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [localities, setLocalities] = useState<Locality[]>([]);
-  const [searchFocused, setSearchFocused] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { theme, setTheme, resolvedTheme } = useTheme();
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
 
   useEffect(() => {
     api.get<{ categories: Category[] }>('/api/categories').then((r) => setCategories(r.categories || [])).catch(() => {});
     api.get<{ localities: Locality[] }>('/api/localities').then((r) => setLocalities(r.localities || [])).catch(() => {});
-  }, []);
+    if (isAuthenticated) {
+      api.get<{ enquiries: { status: string }[] }>('/api/enquiries').then((r) => {
+        const openCount = (r.enquiries || []).filter((e) => e.status === 'OPEN').length;
+        setUnreadCount(openCount);
+      }).catch(() => {});
+    }
+  }, [isAuthenticated]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) setView('browse');
   };
-
-  const isHome = currentView === 'home';
-  const isTransparent = isHome && !scrolled && !searchFocused && !mobileSearchOpen;
 
   const handleNavClick = (view: string, sub?: string) => {
     if (sub === 'categories') setView('browse', undefined, 'all');
@@ -62,49 +58,37 @@ export function Header() {
 
   return (
     <>
-      <header
-        className={`sticky top-0 z-50 relative transition-all duration-300 ${
-          isTransparent
-            ? 'bg-transparent pointer-events-auto'
-            : 'bg-background/95 backdrop-blur-md border-b border-border shadow-sm'
-        }`}
-      >
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-4">
             {/* Logo */}
             <button
               onClick={() => setView('home')}
-              className="flex items-center gap-2 shrink-0 pointer-events-auto relative z-10"
+              className="flex items-center gap-2 shrink-0"
             >
-              <div className={`p-1.5 rounded-lg ${isTransparent ? 'bg-white/20' : 'bg-primary'}`}>
+              <div className="p-1.5 rounded-lg bg-primary">
                 <MapPin className="h-5 w-5 text-white" />
               </div>
-              <span className={`text-xl font-bold tracking-tight ${isTransparent ? 'text-white' : 'text-foreground'}`}>
+              <span className="text-xl font-bold tracking-tight text-foreground">
                 City<span className="text-primary">Dir</span>
               </span>
             </button>
 
             {/* Desktop Search */}
-            <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-xl mx-4 relative z-10">
-              <div className="relative w-full pointer-events-auto">
-                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isTransparent ? 'text-white/70' : 'text-muted-foreground'}`} />
+            <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-xl mx-4">
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
                   placeholder="Search businesses, amenities..."
-                  className={`pl-10 pr-4 h-10 pointer-events-auto ${
-                    isTransparent && !searchFocused
-                      ? 'bg-white/15 border-white/25 text-white placeholder:text-white/60'
-                      : 'bg-muted'
-                  }`}
+                  className="pl-10 pr-4 h-10 bg-muted"
                 />
               </div>
             </form>
 
             {/* Desktop Nav */}
-            <nav className="hidden lg:flex items-center gap-1 relative z-10">
+            <nav className="hidden lg:flex items-center gap-1">
               {[
                 { label: 'Home', view: 'home', icon: Home },
                 { label: 'Categories', view: 'browse', sub: 'categories', icon: FolderOpen },
@@ -115,11 +99,6 @@ export function Header() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleNavClick(link.view, link.sub)}
-                  className={`pointer-events-auto relative ${
-                    isTransparent
-                      ? 'text-white/90 hover:text-white hover:bg-white/15 focus-visible:text-white focus-visible:bg-white/20'
-                      : ''
-                  }`}
                 >
                   {link.label}
                 </Button>
@@ -129,28 +108,44 @@ export function Header() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className={`pointer-events-auto relative ${isTransparent ? 'text-white hover:text-white hover:bg-white/15' : ''}`}
                 aria-label="Toggle theme"
               >
                 {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </Button>
 
+              {isAuthenticated && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative"
+                  onClick={() => {
+                    if (user?.role === 'ADMIN') setView('admin-dashboard');
+                    else if (user?.role === 'BUSINESS_OWNER') setView('owner-dashboard');
+                    else setView('visitor-dashboard');
+                  }}
+                  aria-label="Notifications"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </Button>
+              )}
+
               {!isAuthenticated ? (
                 <div className="flex items-center gap-2 ml-2">
                   <Button
-                    variant={isTransparent ? 'outline' : 'ghost'}
+                    variant="ghost"
                     size="sm"
                     onClick={() => setView('login')}
-                    className={`pointer-events-auto relative ${
-                      isTransparent ? 'border-white/30 text-white hover:bg-white/15 hover:text-white' : ''
-                    }`}
                   >
                     <LogIn className="h-4 w-4 mr-1.5" /> Login
                   </Button>
                   <Button
                     size="sm"
                     onClick={() => setView('register')}
-                    className="pointer-events-auto relative"
                   >
                     <UserPlus className="h-4 w-4 mr-1.5" /> Register
                   </Button>
@@ -158,10 +153,7 @@ export function Header() {
               ) : (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className={`gap-2 pointer-events-auto relative ${isTransparent ? 'text-white' : ''}`}
-                    >
+                    <Button variant="ghost" className="gap-2">
                       <Avatar className="h-7 w-7">
                         <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                           {user?.name?.charAt(0) || 'U'}
@@ -195,6 +187,9 @@ export function Header() {
                         <LayoutDashboard className="mr-2 h-4 w-4" /> My Enquiries
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuItem onClick={() => setView('profile')}>
+                      <User className="mr-2 h-4 w-4" /> Profile
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive">
                       <LogOut className="mr-2 h-4 w-4" /> Logout
@@ -205,7 +200,7 @@ export function Header() {
             </nav>
 
             {/* Mobile: Hamburger + Search */}
-            <div className="flex items-center gap-2 lg:hidden relative z-10">
+            <div className="flex items-center gap-2 lg:hidden">
               {mobileSearchOpen ? (
                 <form onSubmit={(e) => { handleSearch(e); setMobileSearchOpen(false); }} className="flex items-center gap-2">
                   <div className="relative">
@@ -227,7 +222,6 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={isTransparent ? 'text-white' : ''}
                     onClick={() => setMobileSearchOpen(true)}
                   >
                     <Search className="h-5 w-5" />
@@ -235,7 +229,6 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={isTransparent ? 'text-white' : ''}
                     onClick={toggleMobileMenu}
                     aria-label="Open menu"
                   >
@@ -324,7 +317,7 @@ export function Header() {
           <nav className="px-2 space-y-1">
             {[
               { label: 'Home', icon: Home, action: () => handleNavClick('home') },
-              { label: 'Browse All', icon: Compass, action: () => setView('browse') },
+              { label: 'Browse All', icon: Compass, action: () => setView('browse', undefined, null, null) },
               { label: 'Categories', icon: FolderOpen, action: () => handleNavClick('browse', 'categories') },
               { label: 'Localities', icon: Map, action: () => handleNavClick('browse', 'localities') },
             ].map((item) => (

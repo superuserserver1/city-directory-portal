@@ -38,7 +38,7 @@ interface AppState {
   sharedDataLoaded: boolean;
 
   // Actions
-  setView: (view: ViewType, businessId?: string, categoryId?: string, localityId?: string) => void;
+  setView: (view: ViewType, businessId?: string | null, categoryId?: string | null, localityId?: string | null) => void;
   setSearchQuery: (query: string) => void;
   setSearchType: (type: string) => void;
   login: (user: User, token: string) => void;
@@ -74,11 +74,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Actions
   setView: (view, businessId, categoryId, localityId) => {
+    const clearCat = categoryId === null;
+    const clearLoc = localityId === null;
     set({
       currentView: view,
       selectedBusinessId: businessId || null,
-      selectedCategoryId: categoryId || (view === 'browse' ? get().selectedCategoryId : null),
-      selectedLocalityId: localityId || (view === 'browse' ? get().selectedLocalityId : null),
+      selectedCategoryId: clearCat ? null : (categoryId || (view === 'browse' ? get().selectedCategoryId : null)),
+      selectedLocalityId: clearLoc ? null : (localityId || (view === 'browse' ? get().selectedLocalityId : null)),
       isMobileMenuOpen: false,
     });
     window.scrollTo(0, 0);

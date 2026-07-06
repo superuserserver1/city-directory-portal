@@ -58,7 +58,7 @@ export function Footer() {
               {categories.length > 6 && (
                 <li>
                   <button
-                    onClick={() => setView('browse', undefined, 'all')}
+                    onClick={() => setView('browse', undefined, null, null)}
                     className="text-sm text-primary/70 hover:text-primary transition-colors font-medium"
                   >
                     View all →
@@ -85,7 +85,7 @@ export function Footer() {
               {localities.length > 6 && (
                 <li>
                   <button
-                    onClick={() => setView('browse', undefined, undefined, 'all')}
+                    onClick={() => setView('browse', undefined, null, null)}
                     className="text-sm text-primary/70 hover:text-primary transition-colors font-medium"
                   >
                     View all →
@@ -105,7 +105,7 @@ export function Footer() {
                 </button>
               </li>
               <li>
-                <button onClick={() => setView('browse')} className="text-sm text-background/55 hover:text-primary transition-colors text-left">
+                <button onClick={() => setView('browse', undefined, null, null)} className="text-sm text-background/55 hover:text-primary transition-colors text-left">
                   Browse All
                 </button>
               </li>
