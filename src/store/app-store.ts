@@ -6,6 +6,7 @@ export type ViewType =
   | 'home'
   | 'browse'
   | 'business-detail'
+  | 'search-results'
   | 'login'
   | 'register'
   | 'admin-dashboard'

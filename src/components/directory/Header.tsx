@@ -18,6 +18,7 @@ import { useTheme } from 'next-themes';
 import {
   Menu, Search, MapPin, LogIn, UserPlus, LayoutDashboard, LogOut, ChevronDown,
   Home, Compass, FolderOpen, Map, X, Sun, Moon, Bell, User, Star, Loader2, Heart,
+  Package, Building2, TreePine,
 } from 'lucide-react';
 import type { Category, Locality } from '@/types';
 
@@ -30,7 +31,7 @@ export function Header() {
   const [localities, setLocalities] = useState<Locality[]>([]);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [suggestions, setSuggestions] = useState<{ id: string; name: string; type: string; rating: number; category: string; locality: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<{ id: string; name: string; type: string; rating: number; category: string; locality: string; price?: string; productType?: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searching, setSearching] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -42,11 +43,19 @@ export function Header() {
     if (q.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
     setSearching(true);
     searchTimeout.current = setTimeout(() => {
-      api.get<{ results: typeof suggestions }>(`/api/search?q=${encodeURIComponent(q)}`)
-        .then((r) => { setSuggestions(r.results || []); setShowSuggestions(true); })
+      api.get<{ products: { id: string; name: string; type: string; price: string; business: { id: string; name: string; locality: { name: string }; category: { name: string } } }[]; businesses: { id: string; name: string; type: string; rating: number; locality: { name: string }; category: { name: string } }[]; amenities: { id: string; name: string; type: string; locality: { name: string }; category: { name: string } }[]; localities: { id: string; name: string; _count: { businesses: number } }[] }>(`/api/search?q=${encodeURIComponent(q)}`)
+        .then((r) => {
+          const mapped: typeof suggestions = [];
+          r.products?.slice(0, 3).forEach(p => mapped.push({ id: p.business.id, name: p.name, type: 'product', rating: 0, category: p.business.category.name, locality: p.business.locality.name, price: p.price, productType: p.type }));
+          r.businesses?.slice(0, 2).forEach(b => mapped.push({ id: b.id, name: b.name, type: 'business', rating: b.rating, category: b.category.name, locality: b.locality.name }));
+          r.amenities?.slice(0, 2).forEach(a => mapped.push({ id: a.id, name: a.name, type: 'amenity', rating: a.rating, category: a.category.name, locality: a.locality.name }));
+          r.localities?.slice(0, 1).forEach(l => mapped.push({ id: l.id, name: l.name, type: 'locality', rating: 0, category: `${l._count.businesses} places`, locality: '' }));
+          setSuggestions(mapped);
+          setShowSuggestions(true);
+        })
         .catch(() => {})
         .finally(() => setSearching(false));
-    }, 250);
+    }, 300);
   }, []);
 
   useEffect(() => {
@@ -71,7 +80,7 @@ export function Header() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setShowSuggestions(false);
-    if (searchQuery.trim()) setView('browse');
+    if (searchQuery.trim()) setView('search-results');
   };
 
   const handleNavClick = (view: string, sub?: string) => {
@@ -108,7 +117,7 @@ export function Header() {
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); doSearch(e.target.value); }}
                   onFocus={() => { if (searchQuery.length >= 2) setShowSuggestions(true); }}
-                  placeholder="Search businesses, amenities..."
+                  placeholder="Search products, services, places..."
                   className="pl-10 pr-10 h-10 bg-muted"
                 />
                 {searchQuery && (
@@ -124,18 +133,22 @@ export function Header() {
                     <div className="p-2">
                       {suggestions.map((s) => (
                         <button
-                          key={s.id}
+                          key={`${s.type}-${s.id}`}
                           type="button"
-                          onClick={() => { setSearchQuery(s.name); setShowSuggestions(false); setView('business-detail', s.id); }}
+                          onClick={() => { setShowSuggestions(false); if (s.type === 'locality') { setView('browse', undefined, undefined, s.id); } else if (s.type === 'product') { setSearchQuery(s.name); setView('search-results'); } else { setView('business-detail', s.id); } }}
                           className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent transition-colors text-left"
                         >
-                          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                            <MapPin className="h-4 w-4 text-primary" />
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${s.type === 'product' ? (s.productType === 'SERVICE' ? 'bg-violet-100 dark:bg-violet-900/30' : 'bg-amber-100 dark:bg-amber-900/30') : s.type === 'amenity' ? 'bg-teal-100 dark:bg-teal-900/30' : s.type === 'locality' ? 'bg-sky-100 dark:bg-sky-900/30' : 'bg-primary/10'}`}>
+                            {s.type === 'product' ? <Package className={`h-4 w-4 ${s.productType === 'SERVICE' ? 'text-violet-500' : 'text-amber-500'}`} /> :
+                             s.type === 'amenity' ? <TreePine className="h-4 w-4 text-teal-600 dark:text-teal-400" /> :
+                             s.type === 'locality' ? <MapPin className="h-4 w-4 text-sky-600 dark:text-sky-400" /> :
+                             <Building2 className="h-4 w-4 text-primary" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{s.name}</p>
-                            <p className="text-xs text-muted-foreground">{s.category} · {s.locality}</p>
+                            <p className="text-xs text-muted-foreground">{s.type === 'locality' ? s.category : `${s.category} · ${s.locality}`}</p>
                           </div>
+                          {s.price && <span className="text-xs font-semibold text-primary shrink-0">{s.price}</span>}
                           {s.rating > 0 && (
                             <div className="flex items-center gap-1 shrink-0">
                               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
@@ -147,7 +160,7 @@ export function Header() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => { setShowSuggestions(false); setView('browse'); }}
+                      onClick={() => { setShowSuggestions(false); setView('search-results'); }}
                       className="w-full text-center p-2.5 text-sm text-primary hover:bg-primary/5 border-t transition-colors font-medium"
                     >
                       View all results for &ldquo;{searchQuery}&rdquo;

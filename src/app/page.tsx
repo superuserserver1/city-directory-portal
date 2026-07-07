@@ -18,6 +18,7 @@ import { VisitorDashboard } from '@/components/directory/VisitorDashboard';
 import { BusinessForm } from '@/components/directory/BusinessForm';
 import { ProfilePage } from '@/components/directory/ProfilePage';
 import { FavoritesPage } from '@/components/directory/FavoritesPage';
+import { SearchResultsPage } from '@/components/directory/SearchResultsPage';
 import { Toaster } from 'sonner';
 
 function BusinessFormWrapper() {
@@ -106,6 +107,7 @@ function AppContent() {
       case 'edit-business': return <EditBusinessWrapper />;
       case 'profile': return <ProfilePage />;
       case 'favorites': return <FavoritesPage />;
+      case 'search-results': return <SearchResultsPage />;
       default: return <HomePage />;
     }
   };
