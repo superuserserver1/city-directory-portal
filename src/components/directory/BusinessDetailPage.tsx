@@ -22,9 +22,10 @@ import {
 import {
   ArrowLeft, MapPin, Phone, Mail, Globe, Star, CheckCircle2, Clock,
   Package, Wrench, Send, ShieldCheck, ExternalLink, Share2, MapPinned,
-  Home, ChevronRight, PackageOpen,
+  Home, ChevronRight, PackageOpen, Heart, MessageSquare,
 } from 'lucide-react';
 import type { BusinessWithRelations, Enquiry } from '@/types';
+import { ReviewsSection } from './ReviewsSection';
 
 function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md' | 'lg' }) {
   const fullStars = Math.floor(rating);
@@ -58,6 +59,7 @@ export function BusinessDetailPage() {
   const [business, setBusiness] = useState<BusinessWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isFav, setIsFav] = useState(false);
 
   // Enquiry form
   const [eqName, setEqName] = useState('');
@@ -73,6 +75,13 @@ export function BusinessDetailPage() {
       .catch(() => toast.error('Failed to load business'))
       .finally(() => setLoading(false));
   }, [selectedBusinessId]);
+
+  useEffect(() => {
+    if (!selectedBusinessId || !isAuthenticated) return;
+    api.get<{ isFavorited: boolean }>(`/api/favorites?businessId=${selectedBusinessId}`)
+      .then((r) => setIsFav(r.isFavorited))
+      .catch(() => {});
+  }, [selectedBusinessId, isAuthenticated]);
 
   useEffect(() => {
     if (user) {
@@ -122,6 +131,15 @@ export function BusinessDetailPage() {
 
   const handleViewOnMap = () => {
     toast.info('Map integration coming soon!', { description: 'We\'re working on adding interactive maps.' });
+  };
+
+  const toggleFavorite = async () => {
+    if (!isAuthenticated || !selectedBusinessId) { toast.error('Please login to save favorites'); return; }
+    try {
+      const r = await api.post<{ isFavorited: boolean }>('/api/favorites', { businessId: selectedBusinessId });
+      setIsFav(r.isFavorited);
+      toast.success(r.isFavorited ? 'Added to favorites' : 'Removed from favorites');
+    } catch { toast.error('Failed to update favorite'); }
   };
 
   if (loading) {
@@ -177,6 +195,19 @@ export function BusinessDetailPage() {
         </div>
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
           <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={`bg-white/90 backdrop-blur-sm hover:bg-white shadow-lg ${isFav ? 'text-red-500' : ''}`}
+                  onClick={toggleFavorite}
+                >
+                  <Heart className={`h-4 w-4 ${isFav ? 'fill-current' : ''}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{isFav ? 'Remove from favorites' : 'Add to favorites'}</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -414,6 +445,9 @@ export function BusinessDetailPage() {
                 <TabsTrigger value="products" className="gap-1.5">
                   <Package className="h-4 w-4" /> Products & Services
                 </TabsTrigger>
+                <TabsTrigger value="reviews" className="gap-1.5">
+                  <MessageSquare className="h-4 w-4" /> Reviews
+                </TabsTrigger>
                 <TabsTrigger value="about" className="gap-1.5">
                   <Clock className="h-4 w-4" /> About
                 </TabsTrigger>
@@ -488,6 +522,10 @@ export function BusinessDetailPage() {
                     )}
                   </>
                 )}
+              </TabsContent>
+
+              <TabsContent value="reviews" className="mt-6">
+                <ReviewsSection businessId={business.id} />
               </TabsContent>
 
               <TabsContent value="about" className="mt-6">

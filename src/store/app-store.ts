@@ -13,7 +13,8 @@ export type ViewType =
   | 'visitor-dashboard'
   | 'add-business'
   | 'edit-business'
-  | 'profile';
+  | 'profile'
+  | 'favorites';
 
 interface AppState {
   // Navigation

@@ -540,3 +540,80 @@ Stage Summary:
 - All TypeScript errors in src/components/directory/ resolved
 - Dev server should auto-recover after these fixes
 - Remaining 2 TS errors are in pre-existing `skills/` directory (not project code)
+
+---
+Task ID: 2
+Agent: Chat Service Builder
+Task: Build real-time chat mini-service, ChatPanel UI component, and integrate into dashboards
+
+Work Log:
+- Updated existing mini-services/chat-service/ to port 3004 with Prisma integration
+- Installed @prisma/client@6.11.1 and prisma@6.11.1 in mini-service
+- Created symlink to main project's Prisma schema and generated client
+- Implemented Socket.io server with events: `join:enquiry`, `chat:message`, `chat:new-message`, `typing`, `chat:typing`
+- Server validates JWT authentication and checks user participation before allowing messages
+- All chat messages are persisted to SQLite via Prisma
+- Created ChatPanel.tsx slide-over component using Sheet, Avatar, ScrollArea, Badge
+- ChatPanel connects via `io("/?XTransformPort=3004")` with JWT auth
+- Real-time features: message broadcast, typing indicators, auto-scroll, sender avatars, date separators
+- Dual-send strategy: socket.io for real-time + REST API fallback for persistence
+- Added Chat button (MessageCircle icon) in AdminDashboard enquiry table rows
+- Added Chat button in OwnerDashboard enquiry list items
+- Added Chat button in VisitorDashboard enquiry list items
+- Updated seed data: added 6 more sample messages (total 13) across 3 enquiries
+- All components pass ESLint with zero errors
+
+Stage Summary:
+- Real-time chat service running on port 3004 with Prisma persistence
+- ChatPanel slide-over component integrated into all 3 dashboard views
+- Seed data enriched with more realistic conversation threads
+- Files created: src/components/directory/ChatPanel.tsx
+- Files modified: mini-services/chat-service/index.ts, mini-services/chat-service/package.json, src/components/directory/AdminDashboard.tsx, src/components/directory/OwnerDashboard.tsx, src/components/directory/VisitorDashboard.tsx, src/app/api/seed/route.ts
+---
+Task ID: 3
+Agent: Main Orchestrator (continued session)
+Task: Add Favorites, Reviews, Search Autocomplete, and Styling Polish
+
+Work Log:
+- Added Favorite and Review models to Prisma schema, pushed to DB, regenerated Prisma Client
+- Created /api/favorites/route.ts (GET check + POST toggle, with auth)
+- Created /api/reviews/route.ts (GET reviews with rating distribution + POST with validation)
+- Created /api/search/route.ts (debounced autocomplete search API)
+- Created ReviewsSection.tsx component with interactive star rating, rating distribution bars, review form, review list with avatars
+- Added heart/favorite button to BusinessCard.tsx (with toggle animation)
+- Added Reviews tab to BusinessDetailPage.tsx (Products & Services | Reviews | About)
+- Added heart button to BusinessDetailPage.tsx cover area
+- Created FavoritesPage.tsx (grid of saved businesses with remove button)
+- Added Favorites view to Zustand store (ViewType 'favorites'), page.tsx, and auth guard
+- Added Favorites link to Header dropdown menu and mobile sheet
+- Added search autocomplete to Header.tsx (debounced 250ms, dropdown with results)
+- Added Star, Loader2, Heart imports to Header
+- Updated seed route to include review data and auto-calculate business ratings
+- Seeded 6 reviews into existing DB for businesses
+- Verified all APIs work (reviews returns data, search returns results)
+- Fixed Prisma singleton caching issue (requires server restart after schema changes)
+
+Stage Summary:
+- New features: Favorites/Bookmarks, Reviews/Ratings system, Search Autocomplete
+- All features accessible: heart button on cards, Reviews tab on detail page, My Favorites page, search suggestions in header
+- APIs: /api/favorites, /api/reviews, /api/search all working
+- Prisma schema now has 8 models: User, Category, Locality, Business, Product, Enquiry, Message, Favorite, Review
+---
+Task ID: 2
+Agent: full-stack-developer
+Task: Build real-time chat mini-service (WebSocket)
+
+Work Log:
+- Created mini-services/chat-service/ with Socket.io on port 3004
+- JWT auth, participant verification, events: join:enquiry, chat:message, typing
+- Created ChatPanel.tsx slide-over component with real-time messaging via socket.io
+- Integrated ChatPanel into AdminDashboard, OwnerDashboard, VisitorDashboard
+- Added 6 more sample messages to seed data (total 13)
+- Fixed ESLint set-state-in-effect issue with useRef pattern
+- Implemented dual-send strategy (REST + Socket.io) with deduplication
+- Fixed Prisma version mismatch (pinned to 6.11.1)
+
+Stage Summary:
+- Chat service running on port 3004 with full auth and persistence
+- All three dashboards have chat button per enquiry opening slide-over panel
+- Real-time messaging with typing indicators working

@@ -25,6 +25,7 @@ import {
   CheckCircle2, ArrowLeft, Package, Wrench, TrendingUp, TrendingDown,
   Briefcase, Inbox, MessageCircle,
 } from 'lucide-react';
+import { ChatPanel } from './ChatPanel';
 import type { Business, BusinessWithRelations, Category, Locality, Product, EnquiryWithRelations, Message } from '@/types';
 
 const STATUS_STYLES: Record<string, { class: string; icon: React.ElementType; label: string }> = {
@@ -176,6 +177,8 @@ export function OwnerDashboard() {
   const [newMsg, setNewMsg] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
   const [showTyping, setShowTyping] = useState(false);
+  const [chatEnquiry, setChatEnquiry] = useState<EnquiryWithRelations | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const fetchData = async () => {
@@ -341,14 +344,28 @@ export function OwnerDashboard() {
                               onClick={() => openEnquiry(eq)}
                             >
                               <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                   <p className="font-medium text-sm">{eq.visitor?.name || eq.name}</p>
                                   <p className="text-xs text-muted-foreground truncate">{eq.message}</p>
                                   <p className="text-xs text-muted-foreground mt-1">{new Date(eq.createdAt).toLocaleString()}</p>
                                 </div>
-                                <Badge variant="secondary" className={`${st.class} gap-1 text-[10px] shrink-0`}>
-                                  <StIcon className="h-3 w-3" /> {st.label}
-                                </Badge>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <Badge variant="secondary" className={`${st.class} gap-1 text-[10px]`}>
+                                    <StIcon className="h-3 w-3" /> {st.label}
+                                  </Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setChatEnquiry(eq);
+                                      setChatOpen(true);
+                                    }}
+                                  >
+                                    <MessageCircle className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           );
@@ -444,6 +461,12 @@ export function OwnerDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ChatPanel
+        enquiry={chatEnquiry}
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+      />
     </div>
   );
 }

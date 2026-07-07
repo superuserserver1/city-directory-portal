@@ -17,6 +17,7 @@ import { OwnerDashboard } from '@/components/directory/OwnerDashboard';
 import { VisitorDashboard } from '@/components/directory/VisitorDashboard';
 import { BusinessForm } from '@/components/directory/BusinessForm';
 import { ProfilePage } from '@/components/directory/ProfilePage';
+import { FavoritesPage } from '@/components/directory/FavoritesPage';
 import { Toaster } from 'sonner';
 
 function BusinessFormWrapper() {
@@ -80,7 +81,7 @@ function AppContent() {
 
   useEffect(() => {
     const s = useAppStore.getState();
-    if (!user && ['admin-dashboard', 'owner-dashboard', 'visitor-dashboard'].includes(currentView)) {
+    if (!user && ['admin-dashboard', 'owner-dashboard', 'visitor-dashboard', 'favorites'].includes(currentView)) {
       s.setView('login');
     } else if (user && currentView === 'admin-dashboard' && user.role !== 'ADMIN') {
       s.setView('home');
@@ -104,6 +105,7 @@ function AppContent() {
       case 'add-business': return <BusinessFormWrapper />;
       case 'edit-business': return <EditBusinessWrapper />;
       case 'profile': return <ProfilePage />;
+      case 'favorites': return <FavoritesPage />;
       default: return <HomePage />;
     }
   };

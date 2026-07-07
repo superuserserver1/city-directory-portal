@@ -103,6 +103,24 @@ export interface Message {
   createdAt: string;
 }
 
+export interface Favorite {
+  id: string;
+  userId: string;
+  businessId: string;
+  createdAt: string;
+}
+
+export interface Review {
+  id: string;
+  rating: number;
+  comment?: string;
+  userId: string;
+  businessId: string;
+  createdAt: string;
+  updatedAt: string;
+  user?: Pick<User, 'id' | 'name' | 'avatar'>;
+}
+
 export interface DashboardStats {
   totalUsers: number;
   totalBusinesses: number;

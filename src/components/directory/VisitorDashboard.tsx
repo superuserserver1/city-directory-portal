@@ -18,6 +18,7 @@ import {
   Building2, Inbox, ChevronRight, TrendingUp, TrendingDown,
   Compass, MessageCircle,
 } from 'lucide-react';
+import { ChatPanel } from './ChatPanel';
 import type { EnquiryWithRelations, Message } from '@/types';
 
 const STATUS_STYLES: Record<string, { class: string; icon: React.ElementType; label: string }> = {
@@ -167,6 +168,8 @@ export function VisitorDashboard() {
   const [newMsg, setNewMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [sendingMsg, setSendingMsg] = useState(false);
+  const [chatEnquiry, setChatEnquiry] = useState<EnquiryWithRelations | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const refresh = async () => {
@@ -313,13 +316,27 @@ export function VisitorDashboard() {
                             onClick={() => openEnquiry(eq)}
                           >
                             <div className="flex items-start justify-between gap-2 mb-1">
-                              <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <Building2 className="h-4 w-4 text-primary shrink-0" />
                                 <p className="font-medium text-sm truncate">{eq.business?.name || 'Unknown'}</p>
                               </div>
-                              <Badge variant="secondary" className={`${st.class} gap-1 text-[10px] shrink-0`}>
-                                <StIcon className="h-3 w-3" /> {st.label}
-                              </Badge>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Badge variant="secondary" className={`${st.class} gap-1 text-[10px]`}>
+                                  <StIcon className="h-3 w-3" /> {st.label}
+                                </Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setChatEnquiry(eq);
+                                    setChatOpen(true);
+                                  }}
+                                >
+                                  <MessageCircle className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </div>
                             <p className="text-xs text-muted-foreground line-clamp-2 ml-6">{eq.message}</p>
                             <p className="text-[10px] text-muted-foreground/60 ml-6 mt-1">
@@ -403,6 +420,12 @@ export function VisitorDashboard() {
           </div>
         </div>
       </div>
+
+      <ChatPanel
+        enquiry={chatEnquiry}
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+      />
     </div>
   );
 }

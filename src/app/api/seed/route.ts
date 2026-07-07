@@ -469,12 +469,43 @@ export async function GET() {
         { content: 'Do you have vegetarian options for a party of 20? We are planning a birthday celebration.', enquiryId: enquiry1.id, senderId: visitor.id },
         { content: 'Hello! Yes, we have an extensive vegetarian menu. We can also create a custom party menu. Would you like me to send you our party packages?', enquiryId: enquiry1.id, senderId: owner.id },
         { content: 'That sounds great! Please share the packages.', enquiryId: enquiry1.id, senderId: visitor.id },
+        { content: 'Sure! Our Silver Package is ₹350/person with 3 starters, 2 mains, and dessert. Gold Package at ₹500/person adds live counters. Platinum at ₹800/person includes everything plus a dedicated server and decoration.', enquiryId: enquiry1.id, senderId: owner.id },
+        { content: 'The Gold Package looks perfect for us. Can we schedule it for next Saturday?', enquiryId: enquiry1.id, senderId: visitor.id },
+        { content: 'Next Saturday works! Let me check the availability and get back to you with a confirmation by tomorrow morning.', enquiryId: enquiry1.id, senderId: owner.id },
         { content: 'I would like to book a health checkup package for this weekend. Are appointments available?', enquiryId: enquiry2.id, senderId: visitor.id },
+        { content: 'Thank you for reaching out! We have availability on both Saturday and Sunday this weekend. Would you prefer a morning or afternoon slot?', enquiryId: enquiry2.id, senderId: owner2.id },
+        { content: 'Saturday morning would be ideal. Should I fast before the checkup?', enquiryId: enquiry2.id, senderId: visitor.id },
+        { content: 'Yes, 12 hours of fasting is recommended. Please arrive at 8:30 AM, the checkup takes about 3-4 hours. Bring your ID and any previous medical reports.', enquiryId: enquiry2.id, senderId: owner2.id },
         { content: 'What are the rates for a conference hall booking for 2 days next month?', enquiryId: enquiry3.id, senderId: visitor.id },
         { content: 'Our conference hall rates are ₹25,000 per day. For a 2-day booking, we offer a 10% discount at ₹45,000. The hall accommodates up to 200 guests with projector and sound system included.', enquiryId: enquiry3.id, senderId: owner.id },
         { content: 'That works for us. Thank you!', enquiryId: enquiry3.id, senderId: visitor.id },
       ],
     });
+
+    // --- Reviews ---
+    const businessList = await db.business.findMany({ select: { id: true } });
+    const reviewData = [
+      { userId: visitor.id, businessId: businessList.find(b => b.id === grandHotel?.id)?.id || businessList[0].id, rating: 5, comment: 'Absolutely stunning hotel! The rooms were spacious and the service was top-notch. Highly recommend for business events.' },
+      { userId: visitor.id, businessId: businessList.find(b => b.id === hospital?.id)?.id || businessList[1].id, rating: 4, comment: 'Good facilities and caring staff. The wait time was a bit long but overall a positive experience.' },
+      { userId: visitor.id, businessId: businessList.find(b => b.id === sunrise?.id)?.id || businessList[2].id, rating: 5, comment: 'Best biryani in town! The vegetarian thali is also excellent. Great ambiance for family dinners.' },
+      { userId: visitor.id, businessId: businessList.find(b => b.id === techMall?.id)?.id || businessList[3].id, rating: 4, comment: 'Huge mall with all major brands. The food court has amazing variety. Parking could be better.' },
+      { userId: visitor.id, businessId: businessList.find(b => b.id === school?.id)?.id || businessList[4].id, rating: 5, comment: 'Excellent school with dedicated teachers. The extracurricular activities are fantastic for overall development.' },
+      { userId: visitor.id, businessId: businessList.find(b => b.id === airport?.id)?.id || businessList[5].id, rating: 3, comment: 'Decent airport for a smaller city. Clean facilities but limited food options.' },
+    ];
+
+    for (const rd of reviewData) {
+      if (rd.businessId) {
+        await db.review.create({ data: rd });
+      }
+    }
+
+    // Update business ratings based on reviews
+    for (const biz of businessList) {
+      const stats = await db.review.aggregate({ where: { businessId: biz.id }, _avg: { rating: true } });
+      if (stats._avg.rating) {
+        await db.business.update({ where: { id: biz.id }, data: { rating: Math.round(stats._avg.rating * 10) / 10 } });
+      }
+    }
 
     return NextResponse.json({
       message: 'Database seeded successfully',
@@ -486,7 +517,8 @@ export async function GET() {
         businesses: 14,
         products: productData.length,
         enquiries: 3,
-        messages: 7,
+        messages: 13,
+        reviews: reviewData.length,
       },
     });
   } catch (error) {

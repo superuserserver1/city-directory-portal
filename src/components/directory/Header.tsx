@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { useTheme } from 'next-themes';
 import {
   Menu, Search, MapPin, LogIn, UserPlus, LayoutDashboard, LogOut, ChevronDown,
-  Home, Compass, FolderOpen, Map, X, Sun, Moon, Bell, User,
+  Home, Compass, FolderOpen, Map, X, Sun, Moon, Bell, User, Star, Loader2, Heart,
 } from 'lucide-react';
 import type { Category, Locality } from '@/types';
 
@@ -30,7 +30,32 @@ export function Header() {
   const [localities, setLocalities] = useState<Locality[]>([]);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [suggestions, setSuggestions] = useState<{ id: string; name: string; type: string; rating: number; category: string; locality: string }[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
   const { theme, setTheme, resolvedTheme } = useTheme();
+
+  const doSearch = useCallback((q: string) => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (q.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
+    setSearching(true);
+    searchTimeout.current = setTimeout(() => {
+      api.get<{ results: typeof suggestions }>(`/api/search?q=${encodeURIComponent(q)}`)
+        .then((r) => { setSuggestions(r.results || []); setShowSuggestions(true); })
+        .catch(() => {})
+        .finally(() => setSearching(false));
+    }, 250);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+ if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowSuggestions(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   useEffect(() => {
     api.get<{ categories: Category[] }>('/api/categories').then((r) => setCategories(r.categories || [])).catch(() => {});
@@ -45,6 +70,7 @@ export function Header() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setShowSuggestions(false);
     if (searchQuery.trim()) setView('browse');
   };
 
@@ -76,14 +102,58 @@ export function Header() {
 
             {/* Desktop Search */}
             <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-xl mx-4">
-              <div className="relative w-full">
+              <div className="relative w-full" ref={searchRef}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); doSearch(e.target.value); }}
+                  onFocus={() => { if (searchQuery.length >= 2) setShowSuggestions(true); }}
                   placeholder="Search businesses, amenities..."
-                  className="pl-10 pr-4 h-10 bg-muted"
+                  className="pl-10 pr-10 h-10 bg-muted"
                 />
+                {searchQuery && (
+                  <button type="button" onClick={() => { setSearchQuery(''); setSuggestions([]); setShowSuggestions(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                {searching && (
+                  <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1.5 bg-popover border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="p-2">
+                      {suggestions.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => { setSearchQuery(s.name); setShowSuggestions(false); setView('business-detail', s.id); }}
+                          className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <MapPin className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{s.name}</p>
+                            <p className="text-xs text-muted-foreground">{s.category} · {s.locality}</p>
+                          </div>
+                          {s.rating > 0 && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                              <span className="text-xs font-medium">{s.rating.toFixed(1)}</span>
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setShowSuggestions(false); setView('browse'); }}
+                      className="w-full text-center p-2.5 text-sm text-primary hover:bg-primary/5 border-t transition-colors font-medium"
+                    >
+                      View all results for &ldquo;{searchQuery}&rdquo;
+                    </button>
+                  </div>
+                )}
               </div>
             </form>
 
@@ -190,6 +260,9 @@ export function Header() {
                     <DropdownMenuItem onClick={() => setView('profile')}>
                       <User className="mr-2 h-4 w-4" /> Profile
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setView('favorites')}>
+                      <Heart className="mr-2 h-4 w-4" /> My Favorites
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive">
                       <LogOut className="mr-2 h-4 w-4" /> Logout
@@ -280,6 +353,14 @@ export function Header() {
                 >
                   <LayoutDashboard className="h-5 w-5 text-primary" />
                   {user.role === 'ADMIN' ? 'Admin Dashboard' : user.role === 'BUSINESS_OWNER' ? 'My Dashboard' : 'My Enquiries'}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 border-primary/20 hover:bg-primary/5 mt-2"
+                  onClick={() => setView('favorites')}
+                >
+                  <Heart className="h-5 w-5 text-primary" />
+                  My Favorites
                 </Button>
               </div>
             </>

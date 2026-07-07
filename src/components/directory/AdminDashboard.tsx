@@ -25,6 +25,7 @@ import {
   ShieldCheck, Star, Eye, CheckCircle2, Clock, XCircle, ArrowLeft,
   TrendingUp, TrendingDown, Shield, Inbox, UserCog, MessageCircle,
 } from 'lucide-react';
+import { ChatPanel } from './ChatPanel';
 import type { DashboardStats, Category, Locality, Business, BusinessWithRelations, User as UserType, EnquiryWithRelations } from '@/types';
 
 const STATUS_STYLES: Record<string, { class: string; icon: React.ElementType }> = {
@@ -42,6 +43,8 @@ export function AdminDashboard() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [enquiries, setEnquiries] = useState<EnquiryWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chatEnquiry, setChatEnquiry] = useState<EnquiryWithRelations | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const fetchData = async () => {
     const [s, c, l, b, u, eq] = await Promise.all([
@@ -206,6 +209,7 @@ export function AdminDashboard() {
                         <TableHead>Status</TableHead>
                         <TableHead className="min-w-[200px]">Message</TableHead>
                         <TableHead>Date</TableHead>
+                        <TableHead className="w-[60px]">Chat</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -230,6 +234,20 @@ export function AdminDashboard() {
                             <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{eq.message}</TableCell>
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                               {new Date(eq.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setChatEnquiry(eq);
+                                  setChatOpen(true);
+                                }}
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -348,6 +366,12 @@ export function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ChatPanel
+        enquiry={chatEnquiry}
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+      />
     </div>
   );
 }

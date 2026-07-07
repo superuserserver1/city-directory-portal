@@ -1,0 +1,681 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useEffect, useState, useRef } from 'react';
+     4→     4→import { useAppStore } from '@/store/app-store';
+     5→     5→import { api } from '@/lib/api';
+     6→     6→import { toast } from 'sonner';
+     7→     7→import { Button } from '@/components/ui/button';
+     8→     8→import { Badge } from '@/components/ui/badge';
+     9→     9→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    10→    10→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    11→    11→import { Input } from '@/components/ui/input';
+    12→    12→import { Textarea } from '@/components/ui/textarea';
+    13→    13→import { Label } from '@/components/ui/label';
+    14→    14→import { Skeleton } from '@/components/ui/skeleton';
+    15→    15→import {
+    16→    16→  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+    17→    17→} from '@/components/ui/table';
+    18→    18→import {
+    19→    19→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+    20→    20→} from '@/components/ui/dialog';
+    21→    21→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+    22→    22→import { ScrollArea } from '@/components/ui/scroll-area';
+    23→    23→import {
+    24→    24→  Building2, MessageSquare, Plus, Pencil, Trash2, Send, Clock, Eye,
+    25→    25→  CheckCircle2, ArrowLeft, Package, Wrench, TrendingUp, TrendingDown,
+    26→    26→  Briefcase, Inbox, MessageCircle,
+    27→    27→} from 'lucide-react';
+    28→    28→import type { Business, BusinessWithRelations, Category, Locality, Product, EnquiryWithRelations, Message } from '@/types';
+    29→    29→
+    30→    30→const STATUS_STYLES: Record<string, { class: string; icon: React.ElementType; label: string }> = {
+    31→    31→  OPEN: { class: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock, label: 'Open' },
+    32→    32→  IN_PROGRESS: { class: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Eye, label: 'In Progress' },
+    33→    33→  CLOSED: { class: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle2, label: 'Closed' },
+    34→    34→};
+    35→    35→
+    36→    36→function formatDateSeparator(dateStr: string) {
+    37→    37→  const date = new Date(dateStr);
+    38→    38→  const now = new Date();
+    39→    39→  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    40→    40→  const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    41→    41→  const diff = (today.getTime() - msgDay.getTime()) / (1000 * 60 * 60 * 24);
+    42→    42→  if (diff === 0) return 'Today';
+    43→    43→  if (diff === 1) return 'Yesterday';
+    44→    44→  return date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    45→    45→}
+    46→    46→
+    47→    47→function groupMessagesByDate(messages: Message[]) {
+    48→    48→  const groups: { date: string; messages: Message[] }[] = [];
+    49→    49→  let currentGroup: { date: string; messages: Message[] } | null = null;
+    50→    50→
+    51→    51→  for (const msg of messages) {
+    52→    52→    const dateKey = new Date(msg.createdAt).toDateString();
+    53→    53→    if (!currentGroup || currentGroup.date !== dateKey) {
+    54→    54→      currentGroup = { date: dateKey, messages: [msg] };
+    55→    55→      groups.push(currentGroup);
+    56→    56→    } else {
+    57→    57→      currentGroup.messages.push(msg);
+    58→    58→    }
+    59→    59→  }
+    60→    60→  return groups;
+    61→    61→}
+    62→    62→
+    63→    63→function ChatMessages({ messages, userId, messagesEndRef }: { messages: Message[]; userId: string; messagesEndRef: React.RefObject<HTMLDivElement | null> }) {
+    64→    64→  const groups = groupMessagesByDate(messages);
+    65→    65→
+    66→    66→  if (messages.length === 0) {
+    67→    67→    return (
+    68→    68→      <div className="text-center py-8">
+    69→    69→        <MessageCircle className="h-10 w-10 mx-auto mb-2 text-muted-foreground/20" />
+    70→    70→        <p className="text-sm text-muted-foreground">No messages yet. Start the conversation!</p>
+    71→    71→      </div>
+    72→    72→    );
+    73→    73→  }
+    74→    74→
+    75→    75→  return (
+    76→    76→    <div className="space-y-4 pb-4">
+    77→    77→      {groups.map((group) => (
+    78→    78→        <div key={group.date}>
+    79→    79→          <div className="flex items-center gap-3 my-3">
+    80→    80→            <div className="flex-1 h-px bg-border/50" />
+    81→    81→            <span className="text-[11px] text-muted-foreground font-medium">{formatDateSeparator(group.date)}</span>
+    82→    82→            <div className="flex-1 h-px bg-border/50" />
+    83→    83→          </div>
+    84→    84→          <div className="space-y-3">
+    85→    85→            {group.messages.map((msg) => {
+    86→    86→              const isMe = msg.senderId === userId;
+    87→    87→              return (
+    88→    88→                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+    89→    89→                  <div className={`max-w-[80%] sm:max-w-[70%] px-4 py-2.5 text-sm leading-relaxed ${
+    90→    90→                    isMe
+    91→    91→                      ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md shadow-sm'
+    92→    92→                      : 'bg-muted rounded-2xl rounded-bl-md'
+    93→    93→                  }`}>
+    94→    94→                    <p>{msg.content}</p>
+    95→    95→                    <p className={`text-[10px] mt-1.5 ${
+    96→    96→                      isMe ? 'text-primary-foreground/60' : 'text-muted-foreground'
+    97→    97→                    }`}>
+    98→    98→                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+    99→    99→                    </p>
+   100→   100→                  </div>
+   101→   101→                </div>
+   102→   102→              );
+   103→   103→            })}
+   104→   104→          </div>
+   105→   105→        </div>
+   106→   106→      ))}
+   107→   107→      <div ref={messagesEndRef} />
+   108→   108→    </div>
+   109→   109→  );
+   110→   110→}
+   111→   111→
+   112→   112→function TypingIndicator() {
+   113→   113→  return (
+   114→   114→    <div className="flex justify-start">
+   115→   115→      <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+   116→   116→        <div className="flex items-center gap-1">
+   117→   117→          <span className="typing-dot w-2 h-2 rounded-full bg-muted-foreground/50 inline-block" />
+   118→   118→          <span className="typing-dot w-2 h-2 rounded-full bg-muted-foreground/50 inline-block" />
+   119→   119→          <span className="typing-dot w-2 h-2 rounded-full bg-muted-foreground/50 inline-block" />
+   120→   120→        </div>
+   121→   121→      </div>
+   122→   122→    </div>
+   123→   123→  );
+   124→   124→}
+   125→   125→
+   126→   126→function MessageInput({ value, onChange, onSend, disabled, sendingMsg }: {
+   127→   127→  value: string; onChange: (v: string) => void; onSend: () => void; disabled: boolean; sendingMsg: boolean;
+   128→   128→}) {
+   129→   129→  const maxChars = 500;
+   130→   130→  const charCount = value.length;
+   131→   131→  const isOverLimit = charCount > maxChars;
+   132→   132→
+   133→   133→  return (
+   134→   134→    <div className="p-4 border-t shrink-0">
+   135→   135→      <div className="flex gap-2 items-end">
+   136→   136→        <div className="flex-1 relative">
+   137→   137→          <Input
+   138→   138→            value={value}
+   139→   139→            onChange={(e) => onChange(e.target.value.slice(0, maxChars))}
+   140→   140→            placeholder="Type your message..."
+   141→   141→            onKeyDown={(e) => {
+   142→   142→              if (e.key === 'Enter' && !e.shiftKey) {
+   143→   143→                e.preventDefault();
+   144→   144→                if (!isOverLimit) onSend();
+   145→   145→              }
+   146→   146→            }}
+   147→   147→            disabled={disabled || sendingMsg}
+   148→   148→            className="pr-12"
+   149→   149→          />
+   150→   150→          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] ${
+   151→   151→            isOverLimit ? 'text-destructive' : charCount > maxChars * 0.8 ? 'text-amber-500' : 'text-muted-foreground/50'
+   152→   152→          }`}>
+   153→   153→            {charCount}/{maxChars}
+   154→   154→          </span>
+   155→   155→        </div>
+   156→   156→        <Button
+   157→   157→          onClick={onSend}
+   158→   158→          size="icon"
+   159→   159→          disabled={!value.trim() || isOverLimit || sendingMsg}
+   160→   160→          className="shrink-0 rounded-xl"
+   161→   161→        >
+   162→   162→          <Send className="h-4 w-4" />
+   163→   163→        </Button>
+   164→   164→      </div>
+   165→   165→    </div>
+   166→   166→  );
+   167→   167→}
+   168→   168→
+   169→   169→export function OwnerDashboard() {
+   170→   170→  const { user, setView } = useAppStore();
+   171→   171→  const [businesses, setBusinesses] = useState<Business[]>([]);
+   172→   172→  const [enquiries, setEnquiries] = useState<EnquiryWithRelations[]>([]);
+   173→   173→  const [loading, setLoading] = useState(true);
+   174→   174→  const [selectedEnquiry, setSelectedEnquiry] = useState<EnquiryWithRelations | null>(null);
+   175→   175→  const [messages, setMessages] = useState<Message[]>([]);
+   176→   176→  const [newMsg, setNewMsg] = useState('');
+   177→   177→  const [sendingMsg, setSendingMsg] = useState(false);
+   178→   178→  const [showTyping, setShowTyping] = useState(false);
+   179→   179→  const messagesEndRef = useRef<HTMLDivElement>(null);
+   180→   180→
+   181→   181→  const fetchData = async () => {
+   182→   182→    const [b, eq] = await Promise.all([
+   183→   183→      api.get<{ businesses: Business[] }>('/api/businesses?limit=100'),
+   184→   184→      api.get<{ enquiries: EnquiryWithRelations[] }>('/api/enquiries'),
+   185→   185→    ]);
+   186→   186→    return { b, eq };
+   187→   187→  };
+   188→   188→
+   189→   189→  useEffect(() => {
+   190→   190→    let cancelled = false;
+   191→   191→    fetchData()
+   192→   192→      .then(({ b, eq }) => {
+   193→   193→        if (!cancelled) {
+   194→   194→          setBusinesses((b.businesses || []).filter((biz) => biz.ownerId === user?.id));
+   195→   195→          setEnquiries(eq.enquiries || []);
+   196→   196→          setLoading(false);
+   197→   197→        }
+   198→   198→      })
+   199→   199→      .catch(() => { if (!cancelled) { toast.error('Failed to load'); setLoading(false); } });
+   200→   200→    return () => { cancelled = true; };
+   201→   201→  }, [user?.id]);
+   202→   202→
+   203→   203→  const refresh = () => {
+   204→   204→    setLoading(true);
+   205→   205→    fetchData()
+   206→   206→      .then(({ b, eq }) => {
+   207→   207→        setBusinesses((b.businesses || []).filter((biz) => biz.ownerId === user?.id));
+   208→   208→        setEnquiries(eq.enquiries || []);
+   209→   209→      })
+   210→   210→      .catch(() => toast.error('Failed to load'))
+   211→   211→      .finally(() => setLoading(false));
+   212→   212→  };
+   213→   213→
+   214→   214→  useEffect(() => {
+   215→   215→    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+   216→   216→  }, [messages]);
+   217→   217→
+   218→   218→  const openEnquiry = async (eq: EnquiryWithRelations) => {
+   219→   219→    setSelectedEnquiry(eq);
+   220→   220→    try {
+   221→   221→      const data = await api.get<{ enquiry: EnquiryWithRelations & { messages: Message[] } }>(`/api/enquiries/${eq.id}`);
+   222→   222→      setMessages(data.enquiry?.messages || []);
+   223→   223→    } catch { toast.error('Failed to load messages'); }
+   224→   224→  };
+   225→   225→
+   226→   226→  const sendMessage = async () => {
+   227→   227→    if (!newMsg.trim() || !selectedEnquiry) return;
+   228→   228→    setSendingMsg(true);
+   229→   229→    try {
+   230→   230→      const res = await api.post<{ message: Message }>(`/api/enquiries/${selectedEnquiry.id}/messages`, { content: newMsg });
+   231→   231→      setMessages((prev) => [...prev, res.message]);
+   232→   232→      setNewMsg('');
+   233→   233→    } catch { toast.error('Failed to send'); } finally {
+   234→   234→      setSendingMsg(false);
+   235→   235→    }
+   236→   236→  };
+   237→   237→
+   238→   238→  const updateStatus = async (id: string, status: string) => {
+   239→   239→    try {
+   240→   240→      await api.put(`/api/enquiries/${id}`, { status });
+   241→   241→      toast.success('Status updated');
+   242→   242→      refresh();
+   243→   243→      if (selectedEnquiry?.id === id) {
+   244→   244→        setSelectedEnquiry((prev) => prev ? { ...prev, status: status as EnquiryWithRelations['status'] } : null);
+   245→   245→      }
+   246→   246→    } catch { toast.error('Failed to update'); }
+   247→   247→  };
+   248→   248→
+   249→   249→  const openEnquiries = enquiries.filter((e) => e.status === 'OPEN').length;
+   250→   250→  const totalEnq = enquiries.length;
+   251→   251→  const closedEnq = enquiries.filter((e) => e.status === 'CLOSED').length;
+   252→   252→
+   253→   253→  const statCardData = [
+   254→   254→    { icon: Building2, label: 'My Businesses', value: businesses.length, trend: '+2', trendUp: true, gradient: 'from-teal-500 to-emerald-500' },
+   255→   255→    { icon: MessageSquare, label: 'Total Enquiries', value: totalEnq, trend: '+5', trendUp: true, gradient: 'from-emerald-500 to-teal-600' },
+   256→   256→    { icon: Clock, label: 'Open', value: openEnquiries, trend: '-1', trendUp: false, gradient: 'from-teal-600 to-cyan-600' },
+   257→   257→  ];
+   258→   258→
+   259→   259→  return (
+   260→   260→    <div className="animate-fade-in">
+   261→   261→      <div className="gradient-hero py-8 sm:py-10">
+   262→   262→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   263→   263→          <div className="flex items-center gap-3 text-white mb-6">
+   264→   264→            <Button variant="secondary" size="sm" className="bg-white/90" onClick={() => setView('home')}>
+   265→   265→              <ArrowLeft className="h-4 w-4 mr-1.5" /> Home
+   266→   266→            </Button>
+   267→   267→            <h1 className="text-2xl sm:text-3xl font-bold">My Dashboard</h1>
+   268→   268→          </div>
+   269→   269→          {/* Welcome Banner */}
+   270→   270→          <div className="rounded-2xl p-6 sm:p-8 relative overflow-hidden">
+   271→   271→            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.08),transparent_60%)]" />
+   272→   272→            <div className="relative flex items-center justify-between">
+   273→   273→              <div>
+   274→   274→                <h2 className="text-2xl font-bold text-white">Welcome back, {user?.name || 'Owner'}!</h2>
+   275→   275→                <p className="text-white/70 mt-1">Manage your businesses, respond to enquiries, and grow your reach.</p>
+   276→   276→              </div>
+   277→   277→              <div className="hidden sm:block">
+   278→   278→                <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-sm">
+   279→   279→                  <Briefcase className="h-10 w-10 text-white/80" />
+   280→   280→                </div>
+   281→   281→              </div>
+   282→   282→            </div>
+   283→   283→          </div>
+   284→   284→        </div>
+   285→   285→      </div>
+   286→   286→
+   287→   287→      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+   288→   288→        {/* Stats */}
+   289→   289→        {loading ? (
+   290→   290→          <div className="grid grid-cols-3 gap-4 mb-8">
+   291→   291→            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
+   292→   292→          </div>
+   293→   293→        ) : (
+   294→   294→          <div className="grid grid-cols-3 gap-4 mb-8 stagger-children">
+   295→   295→            {statCardData.map((item) => (
+   296→   296→              <EnhancedStatCard
+   297→   297→                key={item.label}
+   298→   298→                icon={item.icon}
+   299→   299→                label={item.label}
+   300→   300→                value={item.value}
+   301→   301→                trend={item.trend}
+   302→   302→                trendUp={item.trendUp}
+   303→   303→                gradient={item.gradient}
+   304→   304→              />
+   305→   305→            ))}
+   306→   306→          </div>
+   307→   307→        )}
+   308→   308→
+   309→   309→        <Tabs defaultValue="enquiries" className="w-full">
+   310→   310→          <TabsList className="flex-wrap h-auto gap-1 bg-muted p-1 rounded-lg">
+   311→   311→            <TabsTrigger value="enquiries" className="gap-1.5"><MessageSquare className="h-4 w-4" /> Enquiries</TabsTrigger>
+   312→   312→            <TabsTrigger value="businesses" className="gap-1.5"><Building2 className="h-4 w-4" /> My Businesses</TabsTrigger>
+   313→   313→          </TabsList>
+   314→   314→
+   315→   315→          <TabsContent value="enquiries" className="mt-6">
+   316→   316→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   317→   317→              {/* Enquiries List */}
+   318→   318→              <Card>
+   319→   319→                <CardHeader><CardTitle className="text-lg">Enquiries ({enquiries.length})</CardTitle></CardHeader>
+   320→   320→                <CardContent>
+   321→   321→                  <ScrollArea className="max-h-[500px]">
+   322→   322→                    {enquiries.length === 0 ? (
+   323→   323→                      <div className="flex flex-col items-center justify-center py-12 text-center">
+   324→   324→                        <div className="p-4 rounded-full bg-muted w-fit mb-4">
+   325→   325→                          <Inbox className="h-10 w-10 text-muted-foreground/40" />
+   326→   326→                        </div>
+   327→   327→                        <p className="text-muted-foreground font-medium">No enquiries received yet.</p>
+   328→   328→                        <p className="text-sm text-muted-foreground/70 mt-1">Enquiries from visitors will appear here.</p>
+   329→   329→                      </div>
+   330→   330→                    ) : (
+   331→   331→                      <div className="space-y-2">
+   332→   332→                        {enquiries.map((eq) => {
+   333→   333→                          const st = STATUS_STYLES[eq.status] || STATUS_STYLES.OPEN;
+   334→   334→                          const StIcon = st.icon;
+   335→   335→                          return (
+   336→   336→                            <div
+   337→   337→                              key={eq.id}
+   338→   338→                              className={`p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50 ${
+   339→   339→                                selectedEnquiry?.id === eq.id ? 'border-primary bg-primary/5' : 'border-border/50'
+   340→   340→                              }`}
+   341→   341→                              onClick={() => openEnquiry(eq)}
+   342→   342→                            >
+   343→   343→                              <div className="flex items-start justify-between gap-2">
+   344→   344→                                <div className="min-w-0">
+   345→   345→                                  <p className="font-medium text-sm">{eq.visitor?.name || eq.name}</p>
+   346→   346→                                  <p className="text-xs text-muted-foreground truncate">{eq.message}</p>
+   347→   347→                                  <p className="text-xs text-muted-foreground mt-1">{new Date(eq.createdAt).toLocaleString()}</p>
+   348→   348→                                </div>
+   349→   349→                                <Badge variant="secondary" className={`${st.class} gap-1 text-[10px] shrink-0`}>
+   350→   350→                                  <StIcon className="h-3 w-3" /> {st.label}
+   351→   351→                                </Badge>
+   352→   352→                              </div>
+   353→   353→                            </div>
+   354→   354→                          );
+   355→   355→                        })}
+   356→   356→                      </div>
+   357→   357→                    )}
+   358→   358→                  </ScrollArea>
+   359→   359→                </CardContent>
+   360→   360→              </Card>
+   361→   361→
+   362→   362→              {/* Chat Area */}
+   363→   363→              <Card className="flex flex-col">
+   364→   364→                <CardHeader className="pb-3">
+   365→   365→                  <div className="flex items-center justify-between">
+   366→   366→                    <CardTitle className="text-lg">
+   367→   367→                      {selectedEnquiry ? `Chat with ${selectedEnquiry.visitor?.name || selectedEnquiry.name}` : 'Select an enquiry'}
+   368→   368→                    </CardTitle>
+   369→   369→                    {selectedEnquiry && (
+   370→   370→                      <Select
+   371→   371→                        value={selectedEnquiry.status}
+   372→   372→                        onValueChange={(v) => updateStatus(selectedEnquiry.id, v)}
+   373→   373→                      >
+   374→   374→                        <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
+   375→   375→                        <SelectContent>
+   376→   376→                          <SelectItem value="OPEN">Open</SelectItem>
+   377→   377→                          <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+   378→   378→                          <SelectItem value="CLOSED">Closed</SelectItem>
+   379→   379→                        </SelectContent>
+   380→   380→                      </Select>
+   381→   381→                    )}
+   382→   382→                  </div>
+   383→   383→                </CardHeader>
+   384→   384→                <CardContent className="flex-1 flex flex-col">
+   385→   385→                  {selectedEnquiry ? (
+   386→   386→                    <>
+   387→   387→                      {/* Original Enquiry */}
+   388→   388→                      <div className="mb-4 p-3 bg-muted rounded-xl text-sm border border-border/50">
+   389→   389→                        <p className="font-medium text-xs text-muted-foreground mb-1">Original Enquiry</p>
+   390→   390→                        <p>{selectedEnquiry.message}</p>
+   391→   391→                        <p className="text-xs text-muted-foreground mt-1.5">{new Date(selectedEnquiry.createdAt).toLocaleString()}</p>
+   392→   392→                      </div>
+   393→   393→                      {/* Messages */}
+   394→   394→                      <ScrollArea className="flex-1 max-h-[350px]">
+   395→   395→                        <ChatMessages messages={messages} userId={user?.id || ''} messagesEndRef={messagesEndRef} />
+   396→   396→                      </ScrollArea>
+   397→   397→                      {/* Input */}
+   398→   398→                      <MessageInput
+   399→   399→                        value={newMsg}
+   400→   400→                        onChange={setNewMsg}
+   401→   401→                        onSend={sendMessage}
+   402→   402→                        disabled={!selectedEnquiry}
+   403→   403→                        sendingMsg={sendingMsg}
+   404→   404→                      />
+   405→   405→                    </>
+   406→   406→                  ) : (
+   407→   407→                    <div className="flex-1 flex items-center justify-center text-center">
+   408→   408→                      <div>
+   409→   409→                        <div className="p-4 rounded-full bg-muted w-fit mx-auto mb-4">
+   410→   410→                          <MessageCircle className="h-10 w-10 text-muted-foreground/30" />
+   411→   411→                        </div>
+   412→   412→                        <h3 className="text-lg font-semibold mb-1">Select an Enquiry</h3>
+   413→   413→                        <p className="text-sm text-muted-foreground max-w-xs">
+   414→   414→                          Choose an enquiry from the list to view and respond to visitor messages.
+   415→   415→                        </p>
+   416→   416→                      </div>
+   417→   417→                    </div>
+   418→   418→                  )}
+   419→   419→                </CardContent>
+   420→   420→              </Card>
+   421→   421→            </div>
+   422→   422→          </TabsContent>
+   423→   423→
+   424→   424→          <TabsContent value="businesses" className="mt-6">
+   425→   425→            <div className="flex items-center justify-between mb-4">
+   426→   426→              <h2 className="text-lg font-semibold">My Businesses ({businesses.length})</h2>
+   427→   427→              <BusinessFormDialog categories={[]} localities={[]} onRefresh={refresh} />
+   428→   428→            </div>
+   429→   429→            {businesses.length === 0 ? (
+   430→   430→              <Card><CardContent className="py-12 text-center">
+   431→   431→                <div className="p-4 rounded-full bg-muted w-fit mx-auto mb-4">
+   432→   432→                  <Building2 className="h-10 w-10 text-muted-foreground/40" />
+   433→   433→                </div>
+   434→   434→                <p className="text-muted-foreground font-medium">No businesses listed yet.</p>
+   435→   435→                <p className="text-sm text-muted-foreground/70 mt-1">Add your first business to get started.</p>
+   436→   436→              </CardContent></Card>
+   437→   437→            ) : (
+   438→   438→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   439→   439→                {businesses.map((biz) => (
+   440→   440→                  <BusinessManagementCard key={biz.id} business={biz} onRefresh={refresh} />
+   441→   441→                ))}
+   442→   442→              </div>
+   443→   443→            )}
+   444→   444→          </TabsContent>
+   445→   445→        </Tabs>
+   446→   446→      </div>
+   447→   447→    </div>
+   448→   448→  );
+   449→   449→}
+   450→   450→
+   451→   451→function EnhancedStatCard({ icon: Icon, label, value, trend, trendUp, gradient }: {
+   452→   452→  icon: React.ElementType; label: string; value: number; trend: string; trendUp: boolean; gradient: string;
+   453→   453→}) {
+   454→   454→  return (
+   455→   455→    <Card className="relative overflow-hidden border-0 shadow-md">
+   456→   456→      <div className={`absolute top-0 right-0 w-24 h-24 rounded-full bg-gradient-to-br ${gradient} opacity-[0.06] -translate-y-8 translate-x-8`} />
+   457→   457→      <CardContent className="p-5 relative">
+   458→   458→        <div className="flex items-center justify-between">
+   459→   459→          <div>
+   460→   460→            <p className="text-sm text-muted-foreground font-medium">{label}</p>
+   461→   461→            <p className="text-3xl font-bold mt-1">{value}</p>
+   462→   462→          </div>
+   463→   463→          <div className="p-3 rounded-2xl bg-primary/10 text-primary">
+   464→   464→            <Icon className="h-6 w-6" />
+   465→   465→          </div>
+   466→   466→        </div>
+   467→   467→        <p className={`text-xs mt-2 flex items-center gap-1 ${trendUp ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+   468→   468→          {trendUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />} {trend} this month
+   469→   469→        </p>
+   470→   470→      </CardContent>
+   471→   471→    </Card>
+   472→   472→  );
+   473→   473→}
+   474→   474→
+   475→   475→function BusinessManagementCard({ business, onRefresh }: { business: Business; onRefresh: () => void }) {
+   476→   476→  const { setView } = useAppStore();
+   477→   477→  const [products, setProducts] = useState<Product[]>([]);
+   478→   478→  const [showProducts, setShowProducts] = useState(false);
+   479→   479→
+   480→   480→  useEffect(() => {
+   481→   481→    if (showProducts) {
+   482→   482→      api.get<{ products: Product[] }>(`/api/businesses/${business.id}/products`).then((r) => setProducts(r.products || [])).catch(() => {});
+   483→   483→    }
+   484→   484→  }, [showProducts, business.id]);
+   485→   485→
+   486→   486→  const deleteProduct = async (id: string) => {
+   487→   487→    if (!confirm('Delete this product?')) return;
+   488→   488→    try {
+   489→   489→      await api.del(`/api/products/${id}`);
+   490→   490→      toast.success('Product deleted');
+   491→   491→      setProducts((prev) => prev.filter((p) => p.id !== id));
+   492→   492→    } catch { toast.error('Failed'); }
+   493→   493→  };
+   494→   494→
+   495→   495→  return (
+   496→   496→    <Card className="border-border/50">
+   497→   497→      <CardContent className="p-5">
+   498→   498→        <div className="flex items-start justify-between">
+   499→   499→          <div>
+   500→   500→            <h3 className="font-semibold">{business.name}</h3>
+   501→   501→            <div className="flex gap-1.5 mt-1.5">
+   502→   502→              <Badge variant="outline" className="text-[10px]">{business.type}</Badge>
+   503→   503→              {business.isVerified && <Badge variant="secondary" className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Verified</Badge>}
+   504→   504→            </div>
+   505→   505→          </div>
+   506→   506→          <Button variant="outline" size="sm" onClick={() => setView('business-detail', business.id)}>
+   507→   507→            View
+   508→   508→          </Button>
+   509→   509→        </div>
+   510→   510→        <div className="mt-4 flex gap-2">
+   511→   511→          <Button variant="secondary" size="sm" onClick={() => setShowProducts(!showProducts)}>
+   512→   512→            <Package className="h-3.5 w-3.5 mr-1" /> {showProducts ? 'Hide' : 'Products'}
+   513→   513→          </Button>
+   514→   514→          <ProductFormDialog businessId={business.id} onAdd={(p) => setProducts((prev) => [...prev, p])} />
+   515→   515→        </div>
+   516→   516→
+   517→   517→        {showProducts && (
+   518→   518→          <div className="mt-4 border-t pt-4 space-y-2 max-h-48 overflow-y-auto">
+   519→   519→            {products.length === 0 ? (
+   520→   520→              <p className="text-sm text-muted-foreground">No products yet. Add one!</p>
+   521→   521→            ) : (
+   522→   522→              products.map((p) => (
+   523→   523→                <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 group">
+   524→   524→                  <div className="flex items-center gap-2 min-w-0">
+   525→   525→                    {p.type === 'SERVICE' ? <Wrench className="h-4 w-4 text-primary shrink-0" /> : <Package className="h-4 w-4 text-primary shrink-0" />}
+   526→   526→                    <div className="min-w-0">
+   527→   527→                      <p className="text-sm font-medium truncate">{p.name}</p>
+   528→   528→                      {p.price && <p className="text-xs text-primary font-semibold">{p.price}</p>}
+   529→   529→                    </div>
+   530→   530→                  </div>
+   531→   531→                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+   532→   532→                    onClick={() => deleteProduct(p.id)}>
+   533→   533→                    <Trash2 className="h-3.5 w-3.5" />
+   534→   534→                  </Button>
+   535→   535→                </div>
+   536→   536→              ))
+   537→   537→            )}
+   538→   538→          </div>
+   539→   539→        )}
+   540→   540→      </CardContent>
+   541→   541→    </Card>
+   542→   542→  );
+   543→   543→}
+   544→   544→
+   545→   545→function BusinessFormDialog({ categories, localities, onRefresh }: { categories: Category[]; localities: Locality[]; onRefresh: () => void }) {
+   546→   546→  const { user } = useAppStore();
+   547→   547→  const [open, setOpen] = useState(false);
+   548→   548→  const [name, setName] = useState('');
+   549→   549→  const [description, setDescription] = useState('');
+   550→   550→  const [type, setType] = useState('BUSINESS');
+   551→   551→  const [categoryId, setCategoryId] = useState('');
+   552→   552→  const [localityId, setLocalityId] = useState('');
+   553→   553→  const [address, setAddress] = useState('');
+   554→   554→  const [phone, setPhone] = useState('');
+   555→   555→  const [email, setEmail] = useState('');
+   556→   556→  const [loading, setLoading] = useState(false);
+   557→   557→  const [cats, setCats] = useState(categories);
+   558→   558→  const [locs, setLocs] = useState(localities);
+   559→   559→
+   560→   560→  useEffect(() => {
+   561→   561→    if (open && cats.length === 0) {
+   562→   562→      api.get<{ categories: Category[] }>('/api/categories').then((r) => setCats(r.categories || [])).catch(() => {});
+   563→   563→      api.get<{ localities: Locality[] }>('/api/localities').then((r) => setLocs(r.localities || [])).catch(() => {});
+   564→   564→    }
+   565→   565→  }, [open]);
+   566→   566→
+   567→   567→  const handleSubmit = async () => {
+   568→   568→    if (!name.trim() || !categoryId || !localityId) { toast.error('Fill required fields'); return; }
+   569→   569→    setLoading(true);
+   570→   570→    try {
+   571→   571→      await api.post('/api/businesses', { name, description, type, categoryId, localityId, address, phone, email, ownerId: user?.id });
+   572→   572→      toast.success('Business created!');
+   573→   573→      setOpen(false); setName(''); setDescription(''); setAddress(''); setPhone(''); setEmail('');
+   574→   574→      onRefresh();
+   575→   575→    } catch (err: unknown) {
+   576→   576→      toast.error(err instanceof Error ? err.message : 'Failed');
+   577→   577→    } finally { setLoading(false); }
+   578→   578→  };
+   579→   579→
+   580→   580→  return (
+   581→   581→    <Dialog open={open} onOpenChange={setOpen}>
+   582→   582→      <DialogTrigger asChild>
+   583→   583→        <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> Add Business</Button>
+   584→   584→      </DialogTrigger>
+   585→   585→      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+   586→   586→        <DialogHeader><DialogTitle>Add New Business</DialogTitle></DialogHeader>
+   587→   587→        <div className="space-y-3 pt-2">
+   588→   588→          <div><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
+   589→   589→          <div><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" rows={3} /></div>
+   590→   590→          <div className="grid grid-cols-2 gap-3">
+   591→   591→            <div>
+   592→   592→              <Label>Type *</Label>
+   593→   593→              <Select value={type} onValueChange={setType}>
+   594→   594→                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+   595→   595→                <SelectContent>
+   596→   596→                  <SelectItem value="BUSINESS">Business</SelectItem>
+   597→   597→                  <SelectItem value="AMENITY">Amenity</SelectItem>
+   598→   598→                </SelectContent>
+   599→   599→              </Select>
+   600→   600→            </div>
+   601→   601→            <div>
+   602→   602→              <Label>Category *</Label>
+   603→   603→              <Select value={categoryId} onValueChange={setCategoryId}>
+   604→   604→                <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
+   605→   605→                <SelectContent>{cats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+   606→   606→              </Select>
+   607→   607→            </div>
+   608→   608→          </div>
+   609→   609→          <div>
+   610→   610→            <Label>Locality *</Label>
+   611→   611→            <Select value={localityId} onValueChange={setLocalityId}>
+   612→   612→              <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
+   613→   613→              <SelectContent>{locs.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+   614→   614→            </Select>
+   615→   615→          </div>
+   616→   616→          <div><Label>Address</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1" /></div>
+   617→   617→          <div className="grid grid-cols-2 gap-3">
+   618→   618→            <div><Label>Phone</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1" /></div>
+   619→   619→            <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1" /></div>
+   620→   620→          </div>
+   621→   621→          <Button onClick={handleSubmit} className="w-full" disabled={loading}>
+   622→   622→            {loading ? 'Creating...' : 'Create Business'}
+   623→   623→          </Button>
+   624→   624→        </div>
+   625→   625→      </DialogContent>
+   626→   626→    </Dialog>
+   627→   627→  );
+   628→   628→}
+   629→   629→
+   630→   630→function ProductFormDialog({ businessId, onAdd }: { businessId: string; onAdd: (p: Product) => void }) {
+   631→   631→  const [open, setOpen] = useState(false);
+   632→   632→  const [name, setName] = useState('');
+   633→   633→  const [description, setDescription] = useState('');
+   634→   634→  const [price, setPrice] = useState('');
+   635→   635→  const [type, setType] = useState('PRODUCT');
+   636→   636→  const [loading, setLoading] = useState(false);
+   637→   637→
+   638→   638→  const handleSubmit = async () => {
+   639→   639→    if (!name.trim()) return;
+   640→   640→    setLoading(true);
+   641→   641→    try {
+   642→   642→      const p = await api.post<Product>(`/api/businesses/${businessId}/products`, { name, description, price, type });
+   643→   643→      toast.success('Product added!');
+   644→   644→      onAdd(p);
+   645→   645→      setOpen(false); setName(''); setDescription(''); setPrice('');
+   646→   646→    } catch (err: unknown) {
+   647→   647→      toast.error(err instanceof Error ? err.message : 'Failed');
+   648→   648→    } finally { setLoading(false); }
+   649→   649→  };
+   650→   650→
+   651→   651→  return (
+   652→   652→    <Dialog open={open} onOpenChange={setOpen}>
+   653→   653→      <DialogTrigger asChild>
+   654→   654→        <Button variant="outline" size="sm"><Plus className="h-3.5 w-3.5 mr-1" /> Product</Button>
+   655→   655→      </DialogTrigger>
+   656→   656→      <DialogContent>
+   657→   657→        <DialogHeader><DialogTitle>Add Product / Service</DialogTitle></DialogHeader>
+   658→   658→        <div className="space-y-3 pt-2">
+   659→   659→          <div><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
+   660→   660→          <div><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" rows={2} /></div>
+   661→   661→          <div className="grid grid-cols-2 gap-3">
+   662→   662→            <div><Label>Price</Label><Input value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" placeholder="e.g. ₹500" /></div>
+   663→   663→            <div>
+   664→   664→              <Label>Type</Label>
+   665→   665→              <Select value={type} onValueChange={setType}>
+   666→   666→                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+   667→   667→                <SelectContent>
+   668→   668→                  <SelectItem value="PRODUCT">Product</SelectItem>
+   669→   669→                  <SelectItem value="SERVICE">Service</SelectItem>
+   670→   670→                </SelectContent>
+   671→   671→              </Select>
+   672→   672→            </div>
+   673→   673→          </div>
+   674→   674→          <Button onClick={handleSubmit} className="w-full" disabled={loading}>
+   675→   675→            {loading ? 'Adding...' : 'Add'}
+   676→   676→          </Button>
+   677→   677→        </div>
+   678→   678→      </DialogContent>
+   679→   679→    </Dialog>
+   680→   680→  );
+   681→   681→}

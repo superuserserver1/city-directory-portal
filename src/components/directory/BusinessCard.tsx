@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +11,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Star, CheckCircle2, MapPin, Phone, ArrowRight, Eye, Package } from 'lucide-react';
+import { Star, CheckCircle2, MapPin, Phone, ArrowRight, Eye, Package, Heart } from 'lucide-react';
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 import type { BusinessWithRelations } from '@/types';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -35,10 +38,28 @@ function getGradient(id: string) {
 }
 
 export function BusinessCard({ business }: { business: BusinessWithRelations }) {
-  const { setView } = useAppStore();
+  const { setView, isAuthenticated } = useAppStore();
+  const [isFav, setIsFav] = useState(false);
 
   const productCount = business.products?.length || 0;
   const borderLeftClass = BORDER_LEFT_COLORS[business.type] || BORDER_LEFT_COLORS.BUSINESS;
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    api.get<{ isFavorited: boolean }>(`/api/favorites?businessId=${business.id}`)
+      .then((r) => setIsFav(r.isFavorited))
+      .catch(() => {});
+  }, [isAuthenticated, business.id]);
+
+  const toggleFavorite = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) { toast.error('Please login to save favorites'); return; }
+    try {
+      const r = await api.post<{ isFavorited: boolean }>('/api/favorites', { businessId: business.id });
+      setIsFav(r.isFavorited);
+      toast.success(r.isFavorited ? 'Added to favorites' : 'Removed from favorites');
+    } catch { toast.error('Failed to update favorite'); }
+  };
 
   // Generate a pseudo-review count from the business id hash
   const reviewHash = business.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -71,6 +92,17 @@ export function BusinessCard({ business }: { business: BusinessWithRelations }) 
                     <Badge className="bg-amber-500 text-white text-[10px] border-0 animate-pulse-glow">⭐ Featured</Badge>
                   </div>
                 )}
+                <button
+                  onClick={toggleFavorite}
+                  className={`absolute bottom-3 right-3 p-2 rounded-full backdrop-blur-sm transition-all duration-200 ${
+                    isFav
+                      ? 'bg-red-500 text-white shadow-lg shadow-red-500/30'
+                      : 'bg-white/80 text-gray-600 hover:bg-white hover:text-red-500 hover:scale-110'
+                  }`}
+                  aria-label={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  <Heart className={`h-4 w-4 ${isFav ? 'fill-current' : ''}`} />
+                </button>
                 {/* Business initial */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-white/30 text-6xl font-black">{business.name.charAt(0)}</span>
@@ -127,7 +159,7 @@ export function BusinessCard({ business }: { business: BusinessWithRelations }) 
                   )}
                 </div>
 
-                <Button variant="outline" size="sm" className="w-full mt-1 group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors">
+                <Button variant="outline" size="sm" className="w-full mt-1 group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all duration-200">
                   View Details <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                 </Button>
               </CardContent>
