@@ -3,10 +3,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { api } from '@/lib/api';
+import { CardGridLoader } from './PageLoader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
   Select,
@@ -388,14 +388,7 @@ export function BrowsePage() {
             </div>
 
             {loading ? (
-              <div className={viewMode === 'grid'
-                ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5'
-                : 'space-y-4'
-              }>
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <Skeleton key={i} className={viewMode === 'grid' ? 'h-72 rounded-xl' : 'h-28 rounded-xl'} />
-                ))}
-              </div>
+              <CardGridLoader count={8} />
             ) : businesses.length === 0 ? (
               <div className="text-center py-20">
                 <div className="mx-auto w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6">

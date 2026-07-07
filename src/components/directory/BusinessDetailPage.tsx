@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { BusinessDetailLoader } from './PageLoader';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -185,21 +185,7 @@ export function BusinessDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 rounded-2xl" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-4">
-            <Skeleton className="h-48 rounded-xl" />
-          </div>
-          <div className="md:col-span-2 space-y-4">
-            <Skeleton className="h-12" />
-            <Skeleton className="h-64 rounded-xl" />
-          </div>
-        </div>
-      </div>
-    );
+    return <BusinessDetailLoader />;
   }
 
   if (!business) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore, type ViewType } from '@/store/app-store';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import { BusinessForm } from '@/components/directory/BusinessForm';
 import { ProfilePage } from '@/components/directory/ProfilePage';
 import { FavoritesPage } from '@/components/directory/FavoritesPage';
 import { SearchResultsPage } from '@/components/directory/SearchResultsPage';
-import { Skeleton } from '@/components/ui/skeleton';
+import { InitialPageLoader, ViewTransitionLoader, BusinessDetailLoader } from '@/components/directory/PageLoader';
 
 interface AppShellProps {
   initialBusinessId?: string;
@@ -76,38 +76,31 @@ function EditBusinessWrapper() {
   );
 }
 
-function LoadingSkeleton() {
-  return (
-    <div className="min-h-screen flex flex-col">
-      <div className="h-16 border-b bg-background flex items-center px-4">
-        <Skeleton className="h-8 w-32" />
-        <div className="ml-auto flex gap-4">
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-20" />
-        </div>
-      </div>
-      <main className="flex-1 p-4 max-w-6xl mx-auto w-full">
-        <Skeleton className="h-6 w-48 mb-6" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="space-y-4">
-            <Skeleton className="h-64 w-full rounded-xl" />
-            <Skeleton className="h-48 w-full rounded-xl" />
-          </div>
-          <div className="lg:col-span-2 space-y-4">
-            <Skeleton className="h-40 w-full rounded-xl" />
-            <Skeleton className="h-60 w-full rounded-xl" />
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
-
 export function AppShell({ initialBusinessId, initialSlug, initialCategorySlug }: AppShellProps) {
-  // Derive loading state from the store's currentView instead of using useState
-  // When initialBusinessId is provided, we show skeleton until the effect sets the store
   const currentView = useAppStore((s) => s.currentView);
+  const initialAppReady = useAppStore((s) => s.initialAppReady);
+  const initializeAuth = useAppStore((s) => s.initializeAuth);
+  const loadSharedData = useAppStore((s) => s.loadSharedData);
+  const loadSettings = useAppStore((s) => s.loadSettings);
+  const setInitialAppReady = useAppStore((s) => s.setInitialAppReady);
+  const isTransitioning = useAppStore((s) => s.isTransitioning);
+  const prevViewRef = useRef<ViewType>(currentView);
+
+  // Initialize app data on mount (in AppShell, not AppContent, to avoid deadlock)
+  useEffect(() => {
+    const init = async () => {
+      await Promise.all([
+        initializeAuth(),
+        loadSharedData(),
+        loadSettings(),
+      ]);
+      // Seed data silently
+      api.get('/api/seed').catch(() => {});
+      // Mark app as ready — this dismisses the initial page loader
+      setInitialAppReady(true);
+    };
+    init();
+  }, [initializeAuth, loadSharedData, loadSettings, setInitialAppReady]);
 
   // Initialize store from URL params (for direct business page access)
   useEffect(() => {
@@ -117,14 +110,12 @@ export function AppShell({ initialBusinessId, initialSlug, initialCategorySlug }
         currentView: 'business-detail',
         selectedBusinessId: initialBusinessId,
       });
-      // Replace history state with our custom state (no new entry)
       const urlPath = (initialCategorySlug && initialSlug) ? `/${initialCategorySlug}/${initialSlug}` : window.location.pathname;
       window.history.replaceState(
         { v: 'business-detail' as ViewType, b: initialBusinessId },
         '',
         urlPath
       );
-      // Cache the slug
       if (initialSlug && initialCategorySlug) {
         store.cacheBusinessSlug(initialBusinessId, initialSlug, initialCategorySlug);
       }
@@ -146,13 +137,11 @@ export function AppShell({ initialBusinessId, initialSlug, initialCategorySlug }
           searchType: t || '',
           isMobileMenuOpen: false,
         });
-        // Reset title when navigating away from business detail
         if (v !== 'business-detail') {
           document.title = 'CityDir - Your Complete City Business Directory | Find Businesses, Amenities & Services';
         }
         window.scrollTo(0, 0);
       } else {
-        // No custom state — go to home
         useAppStore.setState({
           currentView: 'home',
           selectedBusinessId: null,
@@ -167,24 +156,21 @@ export function AppShell({ initialBusinessId, initialSlug, initialCategorySlug }
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Show loading skeleton until store is initialized for business page direct access
-  if (initialBusinessId && currentView !== 'business-detail') {
-    return <LoadingSkeleton />;
-  }
-
-  return <AppContent />;
-}
-
-function AppContent() {
-  const { currentView, user, initializeAuth, loadSharedData, loadSettings } = useAppStore();
-
+  // Detect view transitions and show brief loader
   useEffect(() => {
-    initializeAuth();
-    loadSharedData();
-    loadSettings();
-    api.get('/api/seed').catch(() => {});
-  }, []);
+    if (prevViewRef.current !== currentView) {
+      const store = useAppStore.getState();
+      store.setTransitioning(true);
+      const timer = setTimeout(() => {
+        store.setTransitioning(false);
+      }, 350);
+      prevViewRef.current = currentView;
+      return () => clearTimeout(timer);
+    }
+  }, [currentView]);
 
+  // Auth guard
+  const user = useAppStore((s) => s.user);
   useEffect(() => {
     const s = useAppStore.getState();
     if (!user && ['admin-dashboard', 'owner-dashboard', 'visitor-dashboard', 'favorites'].includes(currentView)) {
@@ -198,7 +184,23 @@ function AppContent() {
     }
   }, [currentView, user]);
 
-  const renderView = () => {
+  // Get a message for the transition loader
+  const getTransitionMessage = useCallback((): string => {
+    switch (currentView) {
+      case 'business-detail': return 'Loading business details...';
+      case 'browse': return 'Discovering businesses...';
+      case 'search-results': return 'Searching...';
+      case 'admin-dashboard': return 'Loading dashboard...';
+      case 'owner-dashboard': return 'Loading dashboard...';
+      case 'visitor-dashboard': return 'Loading dashboard...';
+      case 'favorites': return 'Loading favorites...';
+      case 'profile': return 'Loading profile...';
+      case 'add-business': case 'edit-business': return 'Loading form...';
+      default: return 'Loading...';
+    }
+  }, [currentView]);
+
+  const renderView = useCallback(() => {
     switch (currentView) {
       case 'home': return <HomePage />;
       case 'browse': return <BrowsePage />;
@@ -215,13 +217,47 @@ function AppContent() {
       case 'search-results': return <SearchResultsPage />;
       default: return <HomePage />;
     }
-  };
+  }, [currentView]);
+
+  // For direct business URL access before store initializes
+  if (initialBusinessId && currentView !== 'business-detail') {
+    return (
+      <>
+        <InitialPageLoader />
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1"><BusinessDetailLoader /></main>
+          <Footer />
+        </div>
+      </>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1">{renderView()}</main>
-      <Footer />
-    </div>
+    <>
+      {/* Full-screen initial loader overlay — fades out when app is ready */}
+      {!initialAppReady && <InitialPageLoader />}
+
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 relative">
+          {/* View transition loader */}
+          <ViewTransitionLoader
+            isLoading={isTransitioning}
+            message={getTransitionMessage()}
+            size="lg"
+          />
+          {/* Actual view content — hidden behind initial loader until ready */}
+          <div className={
+            initialAppReady
+              ? isTransitioning ? 'opacity-0 transition-opacity duration-300' : 'opacity-100 transition-opacity duration-300'
+              : 'opacity-0'
+          }>
+            {renderView()}
+          </div>
+        </main>
+        <Footer />
+      </div>
+    </>
   );
 }

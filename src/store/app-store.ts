@@ -38,6 +38,8 @@ interface AppState {
 
   // UI
   isMobileMenuOpen: boolean;
+  isTransitioning: boolean;
+  initialAppReady: boolean;
 
   // Shared Data
   categories: Category[];
@@ -63,6 +65,8 @@ interface AppState {
   setSiteSettings: (settings: SiteSettings) => void;
   cacheBusinessSlug: (id: string, slug: string, categorySlug: string) => void;
   cacheBusinessSlugs: (entries: Array<{ id: string; slug: string; categorySlug: string }>) => void;
+  setTransitioning: (v: boolean) => void;
+  setInitialAppReady: (v: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -81,6 +85,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // UI
   isMobileMenuOpen: false,
+  isTransitioning: false,
+  initialAppReady: false,
 
   // Shared Data
   categories: [],
@@ -223,6 +229,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (changed) set({ businessSlugCache: cache });
   },
+
+  setTransitioning: (v) => set({ isTransitioning: v }),
+
+  setInitialAppReady: (v) => set({ initialAppReady: v }),
 
   initializeAuth: async () => {
     const token = localStorage.getItem('citydir_token');
