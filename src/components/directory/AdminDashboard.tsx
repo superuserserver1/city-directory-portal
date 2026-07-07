@@ -26,6 +26,7 @@ import {
   TrendingUp, TrendingDown, Shield, Inbox, UserCog, MessageCircle,
 } from 'lucide-react';
 import { ChatPanel } from './ChatPanel';
+import { UserManagement } from './UserManagement';
 import type { DashboardStats, Category, Locality, Business, BusinessWithRelations, User as UserType, EnquiryWithRelations } from '@/types';
 
 const STATUS_STYLES: Record<string, { class: string; icon: React.ElementType }> = {
@@ -320,49 +321,7 @@ export function AdminDashboard() {
 
           {/* Users Tab */}
           <TabsContent value="users" className="mt-6">
-            <Card>
-              <CardHeader><CardTitle className="text-lg">All Users</CardTitle></CardHeader>
-              <CardContent className="overflow-x-auto max-h-96">
-                {users.length === 0 ? (
-                  <EmptyState icon={UserCog} message="No users registered yet." description="Users will appear here once they sign up." />
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Joined</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((u) => (
-                        <TableRow key={u.id} className="even:bg-muted/30 hover:bg-muted/50 transition-colors">
-                          <TableCell className="font-medium">{u.name}</TableCell>
-                          <TableCell className="text-sm">{u.email}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className={
-                              u.role === 'ADMIN' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                              u.role === 'BUSINESS_OWNER' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                              'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                            }>{u.role.replace('_', ' ')}</Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</TableCell>
-                          <TableCell>
-                            {u.role !== 'ADMIN' && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteUser(u.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
+            <UserManagement />
           </TabsContent>
         </Tabs>
       </div>
