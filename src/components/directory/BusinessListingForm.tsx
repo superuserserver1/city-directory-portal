@@ -452,20 +452,20 @@ export function BusinessListingForm({ businessId, onSuccess, isAdmin = false }: 
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 0: return <StepBasicInfo />;
-      case 1: return <StepDescription />;
-      case 2: return <StepImages />;
-      case 3: return <StepSocialMedia />;
-      case 4: return <StepHours />;
-      case 5: return <StepProducts />;
-      case 6: return <StepReview />;
+      case 0: return renderBasicInfo();
+      case 1: return renderDescription();
+      case 2: return renderImages();
+      case 3: return renderSocialMedia();
+      case 4: return renderHours();
+      case 5: return renderProducts();
+      case 6: return renderReview();
       default: return null;
     }
   };
 
   // ─── Step Components ──────────────────────────────────────────
 
-  function StepBasicInfo() {
+  function renderBasicInfo() {
     return (
       <div className="space-y-5">
         <div className="space-y-1.5">
@@ -579,7 +579,7 @@ export function BusinessListingForm({ businessId, onSuccess, isAdmin = false }: 
     );
   }
 
-  function StepDescription() {
+  function renderDescription() {
     return (
       <div className="space-y-5">
         <div className="space-y-1.5">
@@ -614,7 +614,7 @@ export function BusinessListingForm({ businessId, onSuccess, isAdmin = false }: 
     );
   }
 
-  function StepImages() {
+  function renderImages() {
     return (
       <div className="space-y-5">
         <div className="space-y-1.5">
@@ -718,7 +718,7 @@ export function BusinessListingForm({ businessId, onSuccess, isAdmin = false }: 
     );
   }
 
-  function StepSocialMedia() {
+  function renderSocialMedia() {
     const socialFields = [
       { key: 'facebook' as const, label: 'Facebook URL', placeholder: 'https://facebook.com/yourpage', icon: Facebook, color: 'text-blue-600' },
       { key: 'instagram' as const, label: 'Instagram URL', placeholder: 'https://instagram.com/yourprofile', icon: Instagram, color: 'text-pink-600' },
@@ -795,7 +795,7 @@ export function BusinessListingForm({ businessId, onSuccess, isAdmin = false }: 
     );
   }
 
-  function StepHours() {
+  function renderHours() {
     return (
       <div className="space-y-5">
         {/* Apply to All */}
@@ -872,7 +872,7 @@ export function BusinessListingForm({ businessId, onSuccess, isAdmin = false }: 
     );
   }
 
-  function StepProducts() {
+  function renderProducts() {
     return (
       <div className="space-y-5">
         <div className="flex items-center justify-between">
@@ -991,7 +991,7 @@ export function BusinessListingForm({ businessId, onSuccess, isAdmin = false }: 
     );
   }
 
-  function StepReview() {
+  function renderReview() {
     const filledProducts = products.filter((p) => p.name.trim());
     const filledGallery = galleryImages.filter((g) => g.url.trim());
     const filledHours = hours.filter((h) => !h.isClosed);
