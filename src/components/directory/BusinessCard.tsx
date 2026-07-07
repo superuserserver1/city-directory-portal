@@ -38,11 +38,18 @@ function getGradient(id: string) {
 }
 
 export function BusinessCard({ business }: { business: BusinessWithRelations }) {
-  const { setView, isAuthenticated } = useAppStore();
+  const { setView, isAuthenticated, cacheBusinessSlug } = useAppStore();
   const [isFav, setIsFav] = useState(false);
 
   const productCount = business.products?.length || 0;
   const borderLeftClass = BORDER_LEFT_COLORS[business.type] || BORDER_LEFT_COLORS.BUSINESS;
+
+  // Cache slug for URL navigation
+  useEffect(() => {
+    if (business.id && business.slug) {
+      cacheBusinessSlug(business.id, business.slug);
+    }
+  }, [business.id, business.slug, cacheBusinessSlug]);
 
   useEffect(() => {
     if (!isAuthenticated) return;

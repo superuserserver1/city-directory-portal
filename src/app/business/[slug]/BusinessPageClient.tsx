@@ -1,11 +1,21 @@
+'use client';
+
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'sonner';
 import { AppShell } from '@/components/directory/AppShell';
 
-export default function Page() {
+interface BusinessPageClientProps {
+  businessId: string;
+  slug: string;
+  businessName: string;
+  category: string;
+  locality: string;
+}
+
+export function BusinessPageClient({ businessId, slug }: BusinessPageClientProps) {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
-      <AppShell />
+      <AppShell initialBusinessId={businessId} initialSlug={slug} />
       <Toaster position="top-right" richColors closeButton />
     </ThemeProvider>
   );

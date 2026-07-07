@@ -24,7 +24,7 @@ import {
 
 interface ProductResult {
   id: string; name: string; description?: string; price?: string; type: 'PRODUCT' | 'SERVICE';
-  business: { id: string; name: string; type: string; rating: number; isVerified: boolean; locality: { name: string }; category: { name: string } };
+  business: { id: string; name: string; slug: string; type: string; rating: number; isVerified: boolean; locality: { name: string }; category: { name: string } };
 }
 interface BusinessResult {
   id: string; name: string; slug: string; type: string; rating: number; isVerified: boolean; isFeatured: boolean;
@@ -52,7 +52,7 @@ interface SearchResult {
 }
 
 export function SearchResultsPage() {
-  const { searchQuery, setSearchQuery, setView, user, isAuthenticated } = useAppStore();
+  const { searchQuery, setSearchQuery, setView, user, isAuthenticated, cacheBusinessSlugs } = useAppStore();
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
@@ -85,6 +85,12 @@ export function SearchResultsPage() {
         signal: controller.signal,
       });
       setResults(res);
+      // Cache business slugs for URL navigation
+      const bizEntries = res.businesses?.map(b => ({ id: b.id, slug: b.slug })) || [];
+      const amenEntries = res.amenities?.map(a => ({ id: a.id, slug: a.slug })) || [];
+      const prodEntries = res.products?.map(p => ({ id: p.business.id, slug: p.business.slug })) || [];
+      const allEntries = [...bizEntries, ...amenEntries, ...prodEntries];
+      if (allEntries.length) cacheBusinessSlugs(allEntries);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       toast.error('Search failed');

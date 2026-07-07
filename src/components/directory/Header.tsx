@@ -26,13 +26,13 @@ export function Header() {
   const {
     currentView, user, isAuthenticated, searchQuery, siteSettings,
     setView, setSearchQuery, logout, toggleMobileMenu,
-    categories, localities,
+    categories, localities, cacheBusinessSlugs,
   } = useAppStore();
   const siteName = siteSettings?.siteName || 'CityDir';
   const cityName = siteSettings?.cityName || 'Our City';
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [suggestions, setSuggestions] = useState<{ id: string; name: string; type: string; rating: number; category: string; locality: string; price?: string; productType?: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<{ id: string; name: string; slug?: string; type: string; rating: number; category: string; locality: string; price?: string; productType?: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searching, setSearching] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -44,20 +44,31 @@ export function Header() {
     if (q.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
     setSearching(true);
     searchTimeout.current = setTimeout(() => {
-      api.get<{ products: { id: string; name: string; type: string; price: string; business: { id: string; name: string; locality: { name: string }; category: { name: string } } }[]; businesses: { id: string; name: string; type: string; rating: number; locality: { name: string }; category: { name: string } }[]; amenities: { id: string; name: string; type: string; locality: { name: string }; category: { name: string } }[]; localities: { id: string; name: string; _count: { businesses: number } }[] }>(`/api/search?q=${encodeURIComponent(q)}`)
+      api.get<{ products: { id: string; name: string; type: string; price: string; business: { id: string; name: string; slug: string; locality: { name: string }; category: { name: string } } }[]; businesses: { id: string; name: string; slug: string; type: string; rating: number; locality: { name: string }; category: { name: string } }[]; amenities: { id: string; name: string; slug: string; type: string; locality: { name: string }; category: { name: string } }[]; localities: { id: string; name: string; _count: { businesses: number } }[] }>(`/api/search?q=${encodeURIComponent(q)}`)
         .then((r) => {
           const mapped: typeof suggestions = [];
-          r.products?.slice(0, 3).forEach(p => mapped.push({ id: p.business.id, name: p.name, type: 'product', rating: 0, category: p.business.category.name, locality: p.business.locality.name, price: p.price, productType: p.type }));
-          r.businesses?.slice(0, 2).forEach(b => mapped.push({ id: b.id, name: b.name, type: 'business', rating: b.rating, category: b.category.name, locality: b.locality.name }));
-          r.amenities?.slice(0, 2).forEach(a => mapped.push({ id: a.id, name: a.name, type: 'amenity', rating: a.rating, category: a.category.name, locality: a.locality.name }));
+          const slugCache: Array<{ id: string; slug: string }> = [];
+          r.products?.slice(0, 3).forEach(p => {
+            slugCache.push({ id: p.business.id, slug: p.business.slug });
+            mapped.push({ id: p.business.id, name: p.name, slug: p.business.slug, type: 'product', rating: 0, category: p.business.category.name, locality: p.business.locality.name, price: p.price, productType: p.type });
+          });
+          r.businesses?.slice(0, 2).forEach(b => {
+            slugCache.push({ id: b.id, slug: b.slug });
+            mapped.push({ id: b.id, name: b.name, slug: b.slug, type: 'business', rating: b.rating, category: b.category.name, locality: b.locality.name });
+          });
+          r.amenities?.slice(0, 2).forEach(a => {
+            slugCache.push({ id: a.id, slug: a.slug });
+            mapped.push({ id: a.id, name: a.name, slug: a.slug, type: 'amenity', rating: a.rating, category: a.category.name, locality: a.locality.name });
+          });
           r.localities?.slice(0, 1).forEach(l => mapped.push({ id: l.id, name: l.name, type: 'locality', rating: 0, category: `${l._count.businesses} places`, locality: '' }));
+          if (slugCache.length) cacheBusinessSlugs(slugCache);
           setSuggestions(mapped);
           setShowSuggestions(true);
         })
         .catch(() => {})
         .finally(() => setSearching(false));
     }, 300);
-  }, []);
+  }, [cacheBusinessSlugs]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

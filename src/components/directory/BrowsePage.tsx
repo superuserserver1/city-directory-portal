@@ -39,7 +39,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 ];
 
 export function BrowsePage() {
-  const { selectedCategoryId, selectedLocalityId, searchQuery, setView, setView: nav } = useAppStore();
+  const { selectedCategoryId, selectedLocalityId, searchQuery, setView, setView: nav, cacheBusinessSlugs } = useAppStore();
   const [businesses, setBusinesses] = useState<BusinessWithRelations[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [localities, setLocalities] = useState<Locality[]>([]);
@@ -83,6 +83,10 @@ export function BrowsePage() {
         `/api/businesses?${params.toString()}`
       );
       setBusinesses(data.businesses || []);
+      // Cache slugs for URL navigation
+      if (data.businesses?.length) {
+        cacheBusinessSlugs(data.businesses.map(b => ({ id: b.id, slug: b.slug })));
+      }
       setTotal(data.pagination?.total || 0);
     } catch {
       setBusinesses([]);

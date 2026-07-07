@@ -40,6 +40,9 @@ interface AppState {
   siteSettings: SiteSettings | null;
   sharedDataLoaded: boolean;
 
+  // URL Navigation
+  businessSlugCache: Record<string, string>;
+
   // Actions
   setView: (view: ViewType, businessId?: string | null, categoryId?: string | null, localityId?: string | null) => void;
   setSearchQuery: (query: string) => void;
@@ -53,6 +56,8 @@ interface AppState {
   loadSharedData: () => Promise<void>;
   loadSettings: () => Promise<void>;
   setSiteSettings: (settings: SiteSettings) => void;
+  cacheBusinessSlug: (id: string, slug: string) => void;
+  cacheBusinessSlugs: (entries: Array<{ id: string; slug: string }>) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -78,17 +83,72 @@ export const useAppStore = create<AppState>((set, get) => ({
   siteSettings: null,
   sharedDataLoaded: false,
 
+  // URL Navigation
+  businessSlugCache: {},
+
   // Actions
   setView: (view, businessId, categoryId, localityId) => {
     const clearCat = categoryId === null;
     const clearLoc = localityId === null;
+    const newCategoryId = clearCat ? null : (categoryId || (view === 'browse' ? get().selectedCategoryId : null));
+    const newLocalityId = clearLoc ? null : (localityId || (view === 'browse' ? get().selectedLocalityId : null));
+
     set({
       currentView: view,
       selectedBusinessId: businessId || null,
-      selectedCategoryId: clearCat ? null : (categoryId || (view === 'browse' ? get().selectedCategoryId : null)),
-      selectedLocalityId: clearLoc ? null : (localityId || (view === 'browse' ? get().selectedLocalityId : null)),
+      selectedCategoryId: newCategoryId,
+      selectedLocalityId: newLocalityId,
       isMobileMenuOpen: false,
     });
+
+    // URL management via History API
+    try {
+      if (view === 'business-detail' && businessId) {
+        const cachedSlug = get().businessSlugCache[businessId];
+        if (cachedSlug) {
+          const state = {
+            v: view,
+            b: businessId,
+            c: newCategoryId,
+            l: newLocalityId,
+            q: get().searchQuery,
+            t: get().searchType,
+          };
+          window.history.pushState(state, '', `/business/${cachedSlug}`);
+        }
+        // If slug not cached, BusinessDetailPage will push the URL after fetching
+      } else if (view !== 'business-detail') {
+        // Non-business views go to root URL — reset document title
+        if (typeof document !== 'undefined') {
+          document.title = 'CityDir - Your Complete City Business Directory | Find Businesses, Amenities & Services';
+        }
+        if (window.location.pathname !== '/') {
+          const state = {
+            v: view,
+            b: null,
+            c: newCategoryId,
+            l: newLocalityId,
+            q: get().searchQuery,
+            t: get().searchType,
+          };
+          window.history.pushState(state, '', '/');
+        } else {
+          // Same URL but update state for back/forward navigation
+          const state = {
+            v: view,
+            b: null,
+            c: newCategoryId,
+            l: newLocalityId,
+            q: get().searchQuery,
+            t: get().searchType,
+          };
+          window.history.replaceState(state, '');
+        }
+      }
+    } catch {
+      // History API not available (SSR), silently ignore
+    }
+
     window.scrollTo(0, 0);
   },
 
@@ -105,6 +165,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     localStorage.removeItem('citydir_user');
     localStorage.removeItem('citydir_token');
     set({ user: null, token: null, isAuthenticated: false, currentView: 'home' });
+    try {
+      window.history.pushState({ v: 'home' }, '', '/');
+    } catch { /* ignore */ }
   },
 
   setUser: (user) => set({ user }),
@@ -134,6 +197,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setSiteSettings: (settings) => set({ siteSettings: settings }),
+
+  cacheBusinessSlug: (id, slug) => {
+    const cache = get().businessSlugCache;
+    if (cache[id] !== slug) {
+      set({ businessSlugCache: { ...cache, [id]: slug } });
+    }
+  },
+
+  cacheBusinessSlugs: (entries) => {
+    const cache = { ...get().businessSlugCache };
+    let changed = false;
+    for (const { id, slug } of entries) {
+      if (cache[id] !== slug) {
+        cache[id] = slug;
+        changed = true;
+      }
+    }
+    if (changed) set({ businessSlugCache: cache });
+  },
 
   initializeAuth: async () => {
     const token = localStorage.getItem('citydir_token');

@@ -55,7 +55,7 @@ function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md
 }
 
 export function BusinessDetailPage() {
-  const { selectedBusinessId, user, isAuthenticated, setView } = useAppStore();
+  const { selectedBusinessId, user, isAuthenticated, setView, cacheBusinessSlug } = useAppStore();
   const [business, setBusiness] = useState<BusinessWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -71,10 +71,36 @@ export function BusinessDetailPage() {
     if (!selectedBusinessId) return;
     setLoading(true);
     api.get<{ business: BusinessWithRelations }>(`/api/businesses/${selectedBusinessId}`)
-      .then((r) => setBusiness(r.business))
+      .then((r) => {
+        setBusiness(r.business);
+        // Cache slug and update URL for SEO-friendly links
+        cacheBusinessSlug(r.business.id, r.business.slug);
+        const expectedPath = `/business/${r.business.slug}`;
+        // Update document title for client-side navigation
+        const seoTitle = `${r.business.name} - ${r.business.category.name} in ${r.business.locality.name}`;
+        document.title = seoTitle;
+        if (window.location.pathname !== expectedPath) {
+          try {
+            window.history.pushState(
+              { v: 'business-detail', b: r.business.id },
+              '',
+              expectedPath
+            );
+          } catch { /* History API not available */ }
+        } else {
+          // Already on correct URL, ensure state is set for popstate
+          try {
+            window.history.replaceState(
+              { v: 'business-detail', b: r.business.id },
+              '',
+              expectedPath
+            );
+          } catch { /* ignore */ }
+        }
+      })
       .catch(() => toast.error('Failed to load business'))
       .finally(() => setLoading(false));
-  }, [selectedBusinessId]);
+  }, [selectedBusinessId, cacheBusinessSlug]);
 
   useEffect(() => {
     if (!selectedBusinessId || !isAuthenticated) return;
@@ -121,9 +147,24 @@ export function BusinessDetailPage() {
   };
 
   const handleShare = () => {
-    const url = `${window.location.origin}?biz=${selectedBusinessId}`;
+    const slug = business?.slug || selectedBusinessId;
+    const url = `${window.location.origin}/business/${slug}`;
+    if (navigator.share) {
+      navigator.share({
+        title: business?.name || 'Business',
+        text: `Check out ${business?.name || 'this business'} on CityDir!`,
+        url,
+      }).catch(() => {
+        copyToClipboard(url);
+      });
+    } else {
+      copyToClipboard(url);
+    }
+  };
+
+  const copyToClipboard = (url: string) => {
     navigator.clipboard.writeText(url).then(() => {
-      toast.success('Link copied to clipboard!');
+      toast.success('Link copied to clipboard!', { description: url });
     }).catch(() => {
       toast.error('Failed to copy link');
     });
