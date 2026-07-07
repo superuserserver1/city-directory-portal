@@ -3,13 +3,52 @@ import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 
-const JWT_SECRET = 'city-directory-secret-key-2024';
+// Generate a secure fallback secret at module load time (at least 32 chars)
+function generateFallbackSecret(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let result = '';
+  const array = new Uint8Array(48);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(array);
+  } else {
+    for (let i = 0; i < array.length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  for (let i = 0; i < array.length; i++) {
+    result += chars[array[i] % chars.length];
+  }
+  return result;
+}
+
+const JWT_SECRET = process.env.JWT_SECRET || generateFallbackSecret();
 const JWT_EXPIRES_IN = '7d';
+
+// In-memory token version store (keyed by userId).
+// Incremented on password change to invalidate existing tokens.
+// Note: This resets on server restart. For production, use a persistent store.
+const tokenVersions = new Map<string, number>();
+
+/**
+ * Get the current token version for a user.
+ */
+export function getTokenVersion(userId: string): number {
+  return tokenVersions.get(userId) || 0;
+}
+
+/**
+ * Increment the token version for a user (invalidates all existing tokens).
+ */
+export function invalidateUserTokens(userId: string): void {
+  const current = tokenVersions.get(userId) || 0;
+  tokenVersions.set(userId, current + 1);
+}
 
 export interface JWTPayload {
   userId: string;
   email: string;
   role: string;
+  tokenVersion?: number;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -21,12 +60,27 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 }
 
 export function generateToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
+  const version = getTokenVersion(payload.userId);
+  const tokenPayload: JWTPayload & { tokenVersion: number } = {
+    ...payload,
+    tokenVersion: version,
+  };
+  return jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload & { tokenVersion?: number };
+    // Check token version to detect invalidated tokens
+    const currentVersion = getTokenVersion(decoded.userId);
+    if (decoded.tokenVersion !== undefined && decoded.tokenVersion < currentVersion) {
+      return null; // Token has been invalidated
+    }
+    return {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role,
+    };
   } catch {
     return null;
   }

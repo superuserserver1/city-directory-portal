@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { extractUserFromRequest, isAdmin, hashPassword } from '@/lib/auth';
+import { extractUserFromRequest, isAdmin, hashPassword, invalidateUserTokens } from '@/lib/auth';
+import {
+  generateRequestId, safeErrorResponse, isPrismaUniqueError, isPrismaNotFoundError,
+  validateEmail, validatePassword, validateName, validatePhone, sanitizeString,
+} from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
     if (!isAdmin(user!.role)) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin access required', requestId }, { status: 403 });
     }
 
     const url = new URL(request.url);
     const search = url.searchParams.get('search') || '';
     const role = url.searchParams.get('role') || '';
     const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = parseInt(url.searchParams.get('limit') || '20');
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
 
     const where: Record<string, unknown> = {};
     if (search) {
@@ -53,47 +58,67 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ users, total, page, limit });
   } catch (error) {
-    console.error('Get users error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error(`Get users error [${requestId}]:`, error);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
     if (!isAdmin(user!.role)) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin access required', requestId }, { status: 403 });
     }
 
     const body = await request.json();
     const { name, email, password, phone, role } = body;
 
-    if (!name || !email || !password) {
-      return NextResponse.json({ error: 'Name, email, and password are required' }, { status: 400 });
+    // Validate name
+    const nameCheck = validateName(name);
+    if (!nameCheck.valid) {
+      return NextResponse.json({ error: nameCheck.error, requestId }, { status: 400 });
     }
 
-    if (password.length < 6) {
-      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+    // Validate email
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) {
+      return NextResponse.json({ error: emailCheck.error, requestId }, { status: 400 });
     }
 
+    // Validate password
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      return NextResponse.json({ error: passwordCheck.error, requestId }, { status: 400 });
+    }
+
+    // Validate phone (optional)
+    if (phone !== undefined && phone !== null) {
+      const phoneCheck = validatePhone(phone);
+      if (!phoneCheck.valid) {
+        return NextResponse.json({ error: phoneCheck.error, requestId }, { status: 400 });
+      }
+    }
+
+    // Validate role (admin can set roles)
     const validRoles = ['ADMIN', 'BUSINESS_OWNER', 'VISITOR'];
     if (role && !validRoles.includes(role)) {
-      return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid role', requestId }, { status: 400 });
     }
 
     // Check if email already exists
-    const existing = await db.user.findUnique({ where: { email } });
+    const existing = await db.user.findUnique({ where: { email: email.trim().toLowerCase() } });
     if (existing) {
-      return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
+      return NextResponse.json({ error: 'A user with this email already exists', requestId }, { status: 409 });
     }
 
     const newUser = await db.user.create({
       data: {
-        name,
-        email,
+        name: sanitizeString(name, 100),
+        email: email.trim().toLowerCase(),
         password: await hashPassword(password),
-        phone: phone || undefined,
+        phone: phone ? sanitizeString(phone, 20) : undefined,
         role: role || 'VISITOR',
       },
       select: {
@@ -109,11 +134,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ user: newUser }, { status: 201 });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2002') {
-      return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
+  } catch (error) {
+    console.error(`Create user error [${requestId}]:`, error);
+    if (isPrismaUniqueError(error)) {
+      return NextResponse.json({ error: 'A user with this email already exists', requestId }, { status: 409 });
     }
-    console.error('Create user error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }

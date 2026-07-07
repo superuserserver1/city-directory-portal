@@ -483,14 +483,17 @@ export async function GET() {
     });
 
     // --- Reviews ---
-    const businessList = await db.business.findMany({ select: { id: true } });
+    // Map review businesses by index into the businesses array:
+    // businesses[2] = The Grand Hotel, businesses[3] = City General Hospital,
+    // businesses[4] = Sunrise Restaurant, businesses[5] = TechHub Shopping Mall,
+    // businesses[7] = City International School, businesses[1] = Municipal Airport
     const reviewData = [
-      { userId: visitor.id, businessId: businessList.find(b => b.id === grandHotel?.id)?.id || businessList[0].id, rating: 5, comment: 'Absolutely stunning hotel! The rooms were spacious and the service was top-notch. Highly recommend for business events.' },
-      { userId: visitor.id, businessId: businessList.find(b => b.id === hospital?.id)?.id || businessList[1].id, rating: 4, comment: 'Good facilities and caring staff. The wait time was a bit long but overall a positive experience.' },
-      { userId: visitor.id, businessId: businessList.find(b => b.id === sunrise?.id)?.id || businessList[2].id, rating: 5, comment: 'Best biryani in town! The vegetarian thali is also excellent. Great ambiance for family dinners.' },
-      { userId: visitor.id, businessId: businessList.find(b => b.id === techMall?.id)?.id || businessList[3].id, rating: 4, comment: 'Huge mall with all major brands. The food court has amazing variety. Parking could be better.' },
-      { userId: visitor.id, businessId: businessList.find(b => b.id === school?.id)?.id || businessList[4].id, rating: 5, comment: 'Excellent school with dedicated teachers. The extracurricular activities are fantastic for overall development.' },
-      { userId: visitor.id, businessId: businessList.find(b => b.id === airport?.id)?.id || businessList[5].id, rating: 3, comment: 'Decent airport for a smaller city. Clean facilities but limited food options.' },
+      { userId: visitor.id, businessId: businesses[2].id, rating: 5, comment: 'Absolutely stunning hotel! The rooms were spacious and the service was top-notch. Highly recommend for business events.' },
+      { userId: visitor.id, businessId: businesses[3].id, rating: 4, comment: 'Good facilities and caring staff. The wait time was a bit long but overall a positive experience.' },
+      { userId: visitor.id, businessId: businesses[4].id, rating: 5, comment: 'Best biryani in town! The vegetarian thali is also excellent. Great ambiance for family dinners.' },
+      { userId: visitor.id, businessId: businesses[5].id, rating: 4, comment: 'Huge mall with all major brands. The food court has amazing variety. Parking could be better.' },
+      { userId: visitor.id, businessId: businesses[7].id, rating: 5, comment: 'Excellent school with dedicated teachers. The extracurricular activities are fantastic for overall development.' },
+      { userId: visitor.id, businessId: businesses[1].id, rating: 3, comment: 'Decent airport for a smaller city. Clean facilities but limited food options.' },
     ];
 
     for (const rd of reviewData) {
@@ -500,7 +503,7 @@ export async function GET() {
     }
 
     // Update business ratings based on reviews
-    for (const biz of businessList) {
+    for (const biz of businesses) {
       const stats = await db.review.aggregate({ where: { businessId: biz.id }, _avg: { rating: true } });
       if (stats._avg.rating) {
         await db.business.update({ where: { id: biz.id }, data: { rating: Math.round(stats._avg.rating * 10) / 10 } });
@@ -523,6 +526,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Seed error:', error);
-    return NextResponse.json({ error: 'Failed to seed database', details: String(error) }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to seed database' }, { status: 500 });
   }
 }

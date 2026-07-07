@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { generateRequestId, safeErrorResponse } from '@/lib/validation';
 
 export async function GET(req: NextRequest) {
+  const requestId = generateRequestId();
   try {
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get('q') || '').trim();
-    const type = searchParams.get('type') || 'all'; // all, products, businesses, amenities, localities
+    const type = searchParams.get('type') || 'all';
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
 
     if (!q || q.length < 2) {
       return NextResponse.json({ products: [], businesses: [], amenities: [], localities: [], query: q, total: 0 });
@@ -38,7 +40,7 @@ export async function GET(req: NextRequest) {
             },
           },
         },
-        take: 20,
+        take: limit,
         orderBy: { createdAt: 'desc' },
       });
       results.products = products;
@@ -69,7 +71,7 @@ export async function GET(req: NextRequest) {
           locality: { select: { name: true } },
           _count: { select: { products: true, reviews: true } },
         },
-        take: 15,
+        take: Math.min(limit, 15),
         orderBy: [{ isFeatured: 'desc' }, { rating: 'desc' }],
       });
       results.businesses = businesses;
@@ -77,7 +79,7 @@ export async function GET(req: NextRequest) {
       results.businesses = [];
     }
 
-    // 3. Search Amenities (Railway station, Airport, Pool, Park, etc.)
+    // 3. Search Amenities
     if (type === 'all' || type === 'amenities') {
       const amenities = await db.business.findMany({
         where: {
@@ -135,7 +137,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ...results, query: q, total });
   } catch (error) {
-    console.error('Search error:', error);
-    return NextResponse.json({ error: 'Search failed' }, { status: 500 });
+    console.error(`Search error [${requestId}]:`, error);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }

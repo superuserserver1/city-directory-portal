@@ -20,15 +20,14 @@ import {
   Home, Compass, FolderOpen, Map, X, Sun, Moon, Bell, User, Star, Loader2, Heart,
   Package, Building2, TreePine,
 } from 'lucide-react';
-import type { Category, Locality } from '@/types';
+
 
 export function Header() {
   const {
     currentView, user, isAuthenticated, searchQuery,
     setView, setSearchQuery, logout, toggleMobileMenu,
+    categories, localities,
   } = useAppStore();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [localities, setLocalities] = useState<Locality[]>([]);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [suggestions, setSuggestions] = useState<{ id: string; name: string; type: string; rating: number; category: string; locality: string; price?: string; productType?: string }[]>([]);
@@ -67,8 +66,6 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    api.get<{ categories: Category[] }>('/api/categories').then((r) => setCategories(r.categories || [])).catch(() => {});
-    api.get<{ localities: Locality[] }>('/api/localities').then((r) => setLocalities(r.localities || [])).catch(() => {});
     if (isAuthenticated) {
       api.get<{ enquiries: { status: string }[] }>('/api/enquiries').then((r) => {
         const openCount = (r.enquiries || []).filter((e) => e.status === 'OPEN').length;

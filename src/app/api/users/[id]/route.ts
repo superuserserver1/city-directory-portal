@@ -1,21 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { extractUserFromRequest, isAdmin, hashPassword } from '@/lib/auth';
+import { extractUserFromRequest, isAdmin, hashPassword, invalidateUserTokens } from '@/lib/auth';
+import { generateRequestId, safeErrorResponse, isPrismaNotFoundError, validatePassword } from '@/lib/validation';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
     if (!isAdmin(user!.role)) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin access required', requestId }, { status: 403 });
     }
 
     const { id } = await params;
     const body = await request.json();
     const { name, email, phone, role, avatar, password } = body;
+
+    // Validate password if provided
+    if (password) {
+      const passwordCheck = validatePassword(password);
+      if (!passwordCheck.valid) {
+        return NextResponse.json({ error: passwordCheck.error, requestId }, { status: 400 });
+      }
+    }
 
     const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name;
@@ -40,13 +50,18 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json({ user: updatedUser });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2025') {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // If password was changed, invalidate the target user's tokens
+    if (password) {
+      invalidateUserTokens(id);
     }
-    console.error('Update user error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+
+    return NextResponse.json({ user: updatedUser });
+  } catch (error) {
+    console.error(`Update user error [${requestId}]:`, error);
+    if (isPrismaNotFoundError(error)) {
+      return NextResponse.json({ error: 'User not found', requestId }, { status: 404 });
+    }
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }
 
@@ -54,22 +69,23 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
     if (!isAdmin(user!.role)) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin access required', requestId }, { status: 403 });
     }
 
     const { id } = await params;
     await db.user.delete({ where: { id } });
 
     return NextResponse.json({ message: 'User deleted' });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2025') {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  } catch (error) {
+    console.error(`Delete user error [${requestId}]:`, error);
+    if (isPrismaNotFoundError(error)) {
+      return NextResponse.json({ error: 'User not found', requestId }, { status: 404 });
     }
-    console.error('Delete user error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }

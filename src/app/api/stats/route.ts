@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { extractUserFromRequest, isAdmin } from '@/lib/auth';
+import { generateRequestId, safeErrorResponse } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
     if (!isAdmin(user!.role)) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin access required', requestId }, { status: 403 });
     }
 
     const [
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
       recentEnquiries,
     });
   } catch (error) {
-    console.error('Get stats error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error(`Get stats error [${requestId}]:`, error);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }

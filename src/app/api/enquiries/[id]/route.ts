@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { extractUserFromRequest, isAdmin, isBusinessOwner } from '@/lib/auth';
+import { generateRequestId, safeErrorResponse } from '@/lib/validation';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
@@ -27,7 +29,7 @@ export async function GET(
     });
 
     if (!enquiry) {
-      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Enquiry not found', requestId }, { status: 404 });
     }
 
     // Visitors can only see their own enquiries, owners their business enquiries
@@ -36,13 +38,13 @@ export async function GET(
       enquiry.visitorId !== user!.userId &&
       enquiry.business.ownerId !== user!.userId
     ) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Access denied', requestId }, { status: 403 });
     }
 
     return NextResponse.json({ enquiry });
   } catch (error) {
-    console.error('Get enquiry error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error(`Get enquiry error [${requestId}]:`, error);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }
 
@@ -50,6 +52,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
@@ -61,7 +64,7 @@ export async function PUT(
     });
 
     if (!enquiry) {
-      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Enquiry not found', requestId }, { status: 404 });
     }
 
     const canUpdate =
@@ -70,14 +73,14 @@ export async function PUT(
       enquiry.visitorId === user!.userId;
 
     if (!canUpdate) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Access denied', requestId }, { status: 403 });
     }
 
     const body = await request.json();
     const { status } = body;
 
     if (!status || !['OPEN', 'IN_PROGRESS', 'CLOSED'].includes(status)) {
-      return NextResponse.json({ error: 'Valid status is required (OPEN, IN_PROGRESS, CLOSED)' }, { status: 400 });
+      return NextResponse.json({ error: 'Valid status is required (OPEN, IN_PROGRESS, CLOSED)', requestId }, { status: 400 });
     }
 
     const updated = await db.enquiry.update({
@@ -87,7 +90,7 @@ export async function PUT(
 
     return NextResponse.json({ enquiry: updated });
   } catch (error) {
-    console.error('Update enquiry error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error(`Update enquiry error [${requestId}]:`, error);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }

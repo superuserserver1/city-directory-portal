@@ -1,25 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractUserFromRequest, getDbUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { generateRequestId, safeErrorResponse } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
 
     const dbUser = await getDbUser(user!.userId);
     if (!dbUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'User not found', requestId }, { status: 404 });
     }
 
     return NextResponse.json({ user: dbUser });
   } catch (error) {
-    console.error('Get me error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error(`Get me error [${requestId}]:`, error);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
@@ -48,8 +51,8 @@ export async function PUT(request: NextRequest) {
     });
 
     return NextResponse.json({ user: updatedUser });
-  } catch (err) {
-    console.error('Update me error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    console.error(`Update me error [${requestId}]:`, error);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }

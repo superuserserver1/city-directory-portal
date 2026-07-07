@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -61,26 +61,47 @@ export function SearchResultsPage() {
   const [enquiryBusiness, setEnquiryBusiness] = useState<BusinessResult | null>(null);
   const [enquiryMsg, setEnquiryMsg] = useState('');
   const [submittingEnquiry, setSubmittingEnquiry] = useState(false);
+  const searchedQueryRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const doSearch = async (query: string) => {
-    if (!query.trim() || query.length < 2) return;
+  const doSearch = useCallback(async (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 2) return;
+
+    // Skip if this exact query was already searched
+    if (searchedQueryRef.current === trimmed) return;
+    searchedQueryRef.current = trimmed;
+
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
-      const res = await api.get<SearchResult>(`/api/search?q=${encodeURIComponent(query)}`);
+      const res = await api.get<SearchResult>(`/api/search?q=${encodeURIComponent(trimmed)}`, {
+        signal: controller.signal,
+      });
       setResults(res);
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       toast.error('Search failed');
     } finally {
-      setLoading(false);
+      if (abortControllerRef.current === controller) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (searchQuery.length >= 2) doSearch(searchQuery);
-  }, [searchQuery]);
+  }, [searchQuery, doSearch]);
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    searchedQueryRef.current = null; // Allow re-search on explicit submit
     doSearch(searchQuery);
   };
 

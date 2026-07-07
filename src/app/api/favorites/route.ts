@@ -1,24 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { extractUserFromRequest } from '@/lib/auth';
+import { generateRequestId, safeErrorResponse } from '@/lib/validation';
 
 export async function GET(req: NextRequest) {
+  const requestId = generateRequestId();
   try {
-    const user = await extractUserFromRequest(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, error } = extractUserFromRequest(req);
+    if (error) return error;
 
     const { searchParams } = new URL(req.url);
     const businessId = searchParams.get('businessId');
 
     if (businessId) {
       const favorite = await db.favorite.findUnique({
-        where: { userId_businessId: { userId: user.id, businessId } },
+        where: { userId_businessId: { userId: user!.userId, businessId } },
       });
       return NextResponse.json({ isFavorited: !!favorite });
     }
 
     const favorites = await db.favorite.findMany({
-      where: { userId: user.id },
+      where: { userId: user!.userId },
       include: {
         business: {
           include: { category: true, locality: true, _count: { select: { products: true, enquiries: true } } },
@@ -28,22 +30,23 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ favorites });
-  } catch (err: unknown) {
-    console.error('Favorites error:', err);
-    return NextResponse.json({ error: 'Failed to fetch favorites' }, { status: 500 });
+  } catch (err) {
+    console.error(`Favorites error [${requestId}]:`, err);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
+  const requestId = generateRequestId();
   try {
-    const user = await extractUserFromRequest(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, error } = extractUserFromRequest(req);
+    if (error) return error;
 
     const { businessId } = await req.json();
-    if (!businessId) return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    if (!businessId) return NextResponse.json({ error: 'Business ID required', requestId }, { status: 400 });
 
     const existing = await db.favorite.findUnique({
-      where: { userId_businessId: { userId: user.id, businessId } },
+      where: { userId_businessId: { userId: user!.userId, businessId } },
     });
 
     if (existing) {
@@ -51,10 +54,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ isFavorited: false });
     }
 
-    await db.favorite.create({ data: { userId: user.id, businessId } });
+    await db.favorite.create({ data: { userId: user!.userId, businessId } });
     return NextResponse.json({ isFavorited: true });
-  } catch (err: unknown) {
-    console.error('Favorites POST error:', err);
-    return NextResponse.json({ error: 'Failed to toggle favorite' }, { status: 500 });
+  } catch (err) {
+    console.error(`Favorites POST error [${requestId}]:`, err);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }

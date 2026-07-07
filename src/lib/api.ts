@@ -2,6 +2,7 @@ interface RequestOptions {
   method?: string;
   body?: unknown;
   headers?: Record<string, string>;
+  signal?: AbortSignal;
 }
 
 function getToken(): string | null {
@@ -10,7 +11,7 @@ function getToken(): string | null {
 }
 
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, headers = {} } = options;
+  const { method = 'GET', body, headers = {}, signal } = options;
   const token = getToken();
 
   const config: RequestInit = {
@@ -26,6 +27,10 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     config.body = JSON.stringify(body);
   }
 
+  if (signal) {
+    config.signal = signal;
+  }
+
   const res = await fetch(endpoint, config);
   const data = await res.json();
 
@@ -37,8 +42,8 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 }
 
 export const api = {
-  get: <T>(endpoint: string) => request<T>(endpoint),
-  post: <T>(endpoint: string, body: unknown) => request<T>(endpoint, { method: 'POST', body }),
-  put: <T>(endpoint: string, body: unknown) => request<T>(endpoint, { method: 'PUT', body }),
-  del: <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' }),
+  get: <T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>) => request<T>(endpoint, { ...options, method: 'GET' }),
+  post: <T>(endpoint: string, body: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) => request<T>(endpoint, { ...options, method: 'POST', body }),
+  put: <T>(endpoint: string, body: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) => request<T>(endpoint, { ...options, method: 'PUT', body }),
+  del: <T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>) => request<T>(endpoint, { ...options, method: 'DELETE' }),
 };

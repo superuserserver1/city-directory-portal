@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { extractUserFromRequest, isAdmin, isBusinessOwner } from '@/lib/auth';
+import { generateRequestId, safeErrorResponse, isPrismaNotFoundError } from '@/lib/validation';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = generateRequestId();
   try {
     const { id } = await params;
 
@@ -28,13 +30,13 @@ export async function GET(
     });
 
     if (!business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Business not found', requestId }, { status: 404 });
     }
 
     return NextResponse.json({ business });
   } catch (error) {
-    console.error('Get business error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error(`Get business error [${requestId}]:`, error);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }
 
@@ -42,6 +44,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
@@ -51,11 +54,11 @@ export async function PUT(
 
     const existing = await db.business.findUnique({ where: { id } });
     if (!existing) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Business not found', requestId }, { status: 404 });
     }
 
     if (!isAdmin(user!.role) && existing.ownerId !== user!.userId) {
-      return NextResponse.json({ error: 'You can only edit your own businesses' }, { status: 403 });
+      return NextResponse.json({ error: 'You can only edit your own businesses', requestId }, { status: 403 });
     }
 
     const {
@@ -89,12 +92,12 @@ export async function PUT(
     });
 
     return NextResponse.json({ business });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2025') {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+  } catch (error) {
+    console.error(`Update business error [${requestId}]:`, error);
+    if (isPrismaNotFoundError(error)) {
+      return NextResponse.json({ error: 'Business not found', requestId }, { status: 404 });
     }
-    console.error('Update business error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }
 
@@ -102,22 +105,23 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = generateRequestId();
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
     if (!isAdmin(user!.role)) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin access required', requestId }, { status: 403 });
     }
 
     const { id } = await params;
     await db.business.delete({ where: { id } });
 
     return NextResponse.json({ message: 'Business deleted' });
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2025') {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+  } catch (error) {
+    console.error(`Delete business error [${requestId}]:`, error);
+    if (isPrismaNotFoundError(error)) {
+      return NextResponse.json({ error: 'Business not found', requestId }, { status: 404 });
     }
-    console.error('Delete business error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }

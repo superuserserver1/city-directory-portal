@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { extractUserFromRequest } from '@/lib/auth';
+import { generateRequestId, safeErrorResponse, sanitizeString } from '@/lib/validation';
 
 export async function GET(req: NextRequest) {
+  const requestId = generateRequestId();
   try {
     const { searchParams } = new URL(req.url);
     const businessId = searchParams.get('businessId');
 
-    if (!businessId) return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    if (!businessId) return NextResponse.json({ error: 'Business ID required', requestId }, { status: 400 });
 
     const [reviews, stats] = await Promise.all([
       db.review.findMany({
@@ -25,10 +27,10 @@ export async function GET(req: NextRequest) {
 
     let userReviewId: string | null = null;
     try {
-      const user = await extractUserFromRequest(req);
-      if (user) {
+      const authResult = extractUserFromRequest(req);
+      if (authResult.user) {
         const userReview = await db.review.findUnique({
-          where: { userId_businessId: { userId: user.id, businessId } },
+          where: { userId_businessId: { userId: authResult.user.userId, businessId } },
         });
         userReviewId = userReview?.id || null;
       }
@@ -42,38 +44,39 @@ export async function GET(req: NextRequest) {
       totalReviews: stats._count,
       userReviewId,
     });
-  } catch (err: unknown) {
-    console.error('Reviews GET error:', err);
-    return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 });
+  } catch (err) {
+    console.error(`Reviews GET error [${requestId}]:`, err);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
+  const requestId = generateRequestId();
   try {
-    const user = await extractUserFromRequest(req);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, error } = extractUserFromRequest(req);
+    if (error) return error;
 
     const body = await req.json();
     const { businessId, rating, comment } = body;
 
     if (!businessId || !rating || rating < 1 || rating > 5) {
-      return NextResponse.json({ error: 'Invalid rating (1-5) and business ID required' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid rating (1-5) and business ID required', requestId }, { status: 400 });
     }
 
-    if (comment && comment.length > 500) {
-      return NextResponse.json({ error: 'Comment too long (max 500 chars)' }, { status: 400 });
+    if (comment && typeof comment === 'string' && comment.length > 500) {
+      return NextResponse.json({ error: 'Comment too long (max 500 chars)', requestId }, { status: 400 });
     }
 
     const existing = await db.review.findUnique({
-      where: { userId_businessId: { userId: user.id, businessId } },
+      where: { userId_businessId: { userId: user!.userId, businessId } },
     });
 
     if (existing) {
-      return NextResponse.json({ error: 'You have already reviewed this business' }, { status: 409 });
+      return NextResponse.json({ error: 'You have already reviewed this business', requestId }, { status: 409 });
     }
 
     const review = await db.review.create({
-      data: { userId: user.id, businessId, rating: Math.round(rating), comment: comment || undefined },
+      data: { userId: user!.userId, businessId, rating: Math.round(rating), comment: comment ? sanitizeString(comment, 500) : undefined },
       include: { user: { select: { id: true, name: true, avatar: true } } },
     });
 
@@ -88,8 +91,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ review }, { status: 201 });
-  } catch (err: unknown) {
-    console.error('Reviews POST error:', err);
-    return NextResponse.json({ error: 'Failed to create review' }, { status: 500 });
+  } catch (err) {
+    console.error(`Reviews POST error [${requestId}]:`, err);
+    return NextResponse.json(safeErrorResponse(requestId), { status: 500 });
   }
 }
