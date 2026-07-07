@@ -51,13 +51,11 @@ export function BusinessOwnerRegisterPage() {
         role: 'BUSINESS_OWNER',
       });
       login(data.user, data.token);
-      toast.success('Account created! Let\'s add your business.');
-      // Navigate to add-business, passing businessName intent
+      toast.success('Account created! Welcome to your dashboard.');
       if (businessName.trim()) {
-        // Store intent in sessionStorage for the form to pick up
         sessionStorage.setItem('citydir_business_intent', businessName.trim());
       }
-      setView('add-business');
+      setView('owner-dashboard');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Registration failed');
     } finally {

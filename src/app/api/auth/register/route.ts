@@ -16,9 +16,11 @@ export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
   try {
     const body = await request.json();
-    const { name, email, password, phone } = body;
+    const { name, email, password, phone, role: requestedRole } = body;
 
-    // SECURITY: Role is NEVER accepted from user input. Always VISITOR for public registration.
+    // Validate role — only VISITOR or BUSINESS_OWNER allowed (ADMIN never from public)
+    const VALID_ROLES = ['VISITOR', 'BUSINESS_OWNER'] as const;
+    const role: string = VALID_ROLES.includes(requestedRole) ? requestedRole : 'VISITOR';
 
     // Validate name
     const nameResult = validateName(name);
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
         email: sanitizedEmail,
         password: hashedPassword,
         phone: sanitizedPhone,
-        role: 'VISITOR', // Always VISITOR for public registration
+        role,
       },
       select: {
         id: true,

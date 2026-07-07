@@ -762,7 +762,7 @@ export function HomePage() {
                 <Button
                   size="lg"
                   className="bg-white text-primary hover:bg-white/90 font-semibold px-8 rounded-xl"
-                  onClick={() => setView('register')}
+                  onClick={() => setView('owner-register')}
                 >
                   Register Now
                 </Button>
