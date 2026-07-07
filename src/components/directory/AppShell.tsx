@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface AppShellProps {
   initialBusinessId?: string;
   initialSlug?: string;
+  initialCategorySlug?: string;
 }
 
 function BusinessFormWrapper() {
@@ -103,7 +104,7 @@ function LoadingSkeleton() {
   );
 }
 
-export function AppShell({ initialBusinessId, initialSlug }: AppShellProps) {
+export function AppShell({ initialBusinessId, initialSlug, initialCategorySlug }: AppShellProps) {
   // Derive loading state from the store's currentView instead of using useState
   // When initialBusinessId is provided, we show skeleton until the effect sets the store
   const currentView = useAppStore((s) => s.currentView);
@@ -117,17 +118,18 @@ export function AppShell({ initialBusinessId, initialSlug }: AppShellProps) {
         selectedBusinessId: initialBusinessId,
       });
       // Replace history state with our custom state (no new entry)
+      const urlPath = (initialCategorySlug && initialSlug) ? `/${initialCategorySlug}/${initialSlug}` : window.location.pathname;
       window.history.replaceState(
         { v: 'business-detail' as ViewType, b: initialBusinessId },
         '',
-        initialSlug ? `/business/${initialSlug}` : window.location.pathname
+        urlPath
       );
       // Cache the slug
-      if (initialSlug) {
-        store.cacheBusinessSlug(initialBusinessId, initialSlug);
+      if (initialSlug && initialCategorySlug) {
+        store.cacheBusinessSlug(initialBusinessId, initialSlug, initialCategorySlug);
       }
     }
-  }, [initialBusinessId, initialSlug]);
+  }, [initialBusinessId, initialSlug, initialCategorySlug]);
 
   // Popstate listener for browser back/forward
   useEffect(() => {

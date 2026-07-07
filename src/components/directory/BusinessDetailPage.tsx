@@ -73,9 +73,9 @@ export function BusinessDetailPage() {
     api.get<{ business: BusinessWithRelations }>(`/api/businesses/${selectedBusinessId}`)
       .then((r) => {
         setBusiness(r.business);
-        // Cache slug and update URL for SEO-friendly links
-        cacheBusinessSlug(r.business.id, r.business.slug);
-        const expectedPath = `/business/${r.business.slug}`;
+        // Cache slug + category slug and update URL for SEO-friendly links
+        cacheBusinessSlug(r.business.id, r.business.slug, r.business.category.slug);
+        const expectedPath = `/${r.business.category.slug}/${r.business.slug}`;
         // Update document title for client-side navigation
         const seoTitle = `${r.business.name} - ${r.business.category.name} in ${r.business.locality.name}`;
         document.title = seoTitle;
@@ -148,7 +148,8 @@ export function BusinessDetailPage() {
 
   const handleShare = () => {
     const slug = business?.slug || selectedBusinessId;
-    const url = `${window.location.origin}/business/${slug}`;
+    const catSlug = business?.category?.slug || 'business';
+    const url = `${window.location.origin}/${catSlug}/${slug}`;
     if (navigator.share) {
       navigator.share({
         title: business?.name || 'Business',

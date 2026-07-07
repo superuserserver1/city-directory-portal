@@ -44,20 +44,20 @@ export function Header() {
     if (q.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
     setSearching(true);
     searchTimeout.current = setTimeout(() => {
-      api.get<{ products: { id: string; name: string; type: string; price: string; business: { id: string; name: string; slug: string; locality: { name: string }; category: { name: string } } }[]; businesses: { id: string; name: string; slug: string; type: string; rating: number; locality: { name: string }; category: { name: string } }[]; amenities: { id: string; name: string; slug: string; type: string; locality: { name: string }; category: { name: string } }[]; localities: { id: string; name: string; _count: { businesses: number } }[] }>(`/api/search?q=${encodeURIComponent(q)}`)
+      api.get<{ products: { id: string; name: string; type: string; price: string; business: { id: string; name: string; slug: string; locality: { name: string }; category: { name: string; slug: string } } }[]; businesses: { id: string; name: string; slug: string; type: string; rating: number; locality: { name: string }; category: { name: string; slug: string } }[]; amenities: { id: string; name: string; slug: string; type: string; locality: { name: string }; category: { name: string; slug: string } }[]; localities: { id: string; name: string; _count: { businesses: number } }[] }>(`/api/search?q=${encodeURIComponent(q)}`)
         .then((r) => {
           const mapped: typeof suggestions = [];
-          const slugCache: Array<{ id: string; slug: string }> = [];
+          const slugCache: Array<{ id: string; slug: string; categorySlug: string }> = [];
           r.products?.slice(0, 3).forEach(p => {
-            slugCache.push({ id: p.business.id, slug: p.business.slug });
+            slugCache.push({ id: p.business.id, slug: p.business.slug, categorySlug: p.business.category?.slug || 'business' });
             mapped.push({ id: p.business.id, name: p.name, slug: p.business.slug, type: 'product', rating: 0, category: p.business.category.name, locality: p.business.locality.name, price: p.price, productType: p.type });
           });
           r.businesses?.slice(0, 2).forEach(b => {
-            slugCache.push({ id: b.id, slug: b.slug });
+            slugCache.push({ id: b.id, slug: b.slug, categorySlug: b.category?.slug || 'business' });
             mapped.push({ id: b.id, name: b.name, slug: b.slug, type: 'business', rating: b.rating, category: b.category.name, locality: b.locality.name });
           });
           r.amenities?.slice(0, 2).forEach(a => {
-            slugCache.push({ id: a.id, slug: a.slug });
+            slugCache.push({ id: a.id, slug: a.slug, categorySlug: a.category?.slug || 'business' });
             mapped.push({ id: a.id, name: a.name, slug: a.slug, type: 'amenity', rating: a.rating, category: a.category.name, locality: a.locality.name });
           });
           r.localities?.slice(0, 1).forEach(l => mapped.push({ id: l.id, name: l.name, type: 'locality', rating: 0, category: `${l._count.businesses} places`, locality: '' }));

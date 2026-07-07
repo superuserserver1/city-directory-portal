@@ -1,10 +1,10 @@
 import { db } from '@/lib/db';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { BusinessPageClient } from './BusinessPageClient';
 
 interface Props {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ category: string; slug: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -55,7 +55,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         ...(business.logo && { images: [business.logo] }),
       },
       alternates: {
-        canonical: `/business/${slug}`,
+        canonical: `/${business.category.slug}/${slug}`,
       },
     };
   } catch {
@@ -63,8 +63,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default async function BusinessSlugPage({ params }: Props) {
-  const { slug } = await params;
+export default async function CategorySlugPage({ params }: Props) {
+  const { category, slug } = await params;
 
   let business;
   try {
@@ -83,10 +83,16 @@ export default async function BusinessSlugPage({ params }: Props) {
     notFound();
   }
 
+  // Redirect to the correct category URL if it doesn't match
+  if (business.category.slug !== category) {
+    redirect(`/${business.category.slug}/${business.slug}`);
+  }
+
   return (
     <BusinessPageClient
       businessId={business.id}
       slug={business.slug}
+      categorySlug={business.category.slug}
       businessName={business.name}
       category={business.category.name}
       locality={business.locality.name}

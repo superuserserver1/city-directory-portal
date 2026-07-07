@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
             select: {
               id: true, name: true, slug: true, type: true, rating: true, isVerified: true,
               locality: { select: { name: true } },
-              category: { select: { name: true } },
+              category: { select: { name: true, slug: true } },
             },
           },
         },
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
         select: {
           id: true, name: true, slug: true, type: true, rating: true, isVerified: true, isFeatured: true,
           address: true, phone: true,
-          category: { select: { name: true, icon: true } },
+          category: { select: { name: true, icon: true, slug: true } },
           locality: { select: { name: true } },
           _count: { select: { products: true, reviews: true } },
         },
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
         select: {
           id: true, name: true, slug: true, type: true, rating: true, isVerified: true,
           address: true, phone: true,
-          category: { select: { name: true, icon: true } },
+          category: { select: { name: true, icon: true, slug: true } },
           locality: { select: { name: true } },
         },
         take: 10,

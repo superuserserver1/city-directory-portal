@@ -24,18 +24,18 @@ import {
 
 interface ProductResult {
   id: string; name: string; description?: string; price?: string; type: 'PRODUCT' | 'SERVICE';
-  business: { id: string; name: string; slug: string; type: string; rating: number; isVerified: boolean; locality: { name: string }; category: { name: string } };
+  business: { id: string; name: string; slug: string; type: string; rating: number; isVerified: boolean; locality: { name: string }; category: { name: string; slug: string } };
 }
 interface BusinessResult {
   id: string; name: string; slug: string; type: string; rating: number; isVerified: boolean; isFeatured: boolean;
   address?: string; phone?: string;
-  category: { name: string; icon?: string }; locality: { name: string };
+  category: { name: string; slug: string; icon?: string }; locality: { name: string };
   _count: { products: number; reviews: number };
 }
 interface AmenityResult {
   id: string; name: string; slug: string; type: string; rating: number; isVerified: boolean;
   address?: string; phone?: string;
-  category: { name: string; icon?: string }; locality: { name: string };
+  category: { name: string; slug: string; icon?: string }; locality: { name: string };
 }
 interface LocalityResult {
   id: string; name: string; slug: string; description?: string;
@@ -86,9 +86,9 @@ export function SearchResultsPage() {
       });
       setResults(res);
       // Cache business slugs for URL navigation
-      const bizEntries = res.businesses?.map(b => ({ id: b.id, slug: b.slug })) || [];
-      const amenEntries = res.amenities?.map(a => ({ id: a.id, slug: a.slug })) || [];
-      const prodEntries = res.products?.map(p => ({ id: p.business.id, slug: p.business.slug })) || [];
+      const bizEntries = (res.businesses || []).map(b => ({ id: b.id, slug: b.slug, categorySlug: b.category?.slug || 'business' }));
+      const amenEntries = (res.amenities || []).map(a => ({ id: a.id, slug: a.slug, categorySlug: a.category?.slug || 'business' }));
+      const prodEntries = (res.products || []).map(p => ({ id: p.business.id, slug: p.business.slug, categorySlug: p.business.category?.slug || 'business' }));
       const allEntries = [...bizEntries, ...amenEntries, ...prodEntries];
       if (allEntries.length) cacheBusinessSlugs(allEntries);
     } catch (err) {

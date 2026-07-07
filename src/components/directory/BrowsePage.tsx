@@ -85,7 +85,11 @@ export function BrowsePage() {
       setBusinesses(data.businesses || []);
       // Cache slugs for URL navigation
       if (data.businesses?.length) {
-        cacheBusinessSlugs(data.businesses.map(b => ({ id: b.id, slug: b.slug })));
+        cacheBusinessSlugs(
+          data.businesses
+            .filter(b => b.slug && b.category?.slug)
+            .map(b => ({ id: b.id, slug: b.slug, categorySlug: b.category.slug }))
+        );
       }
       setTotal(data.pagination?.total || 0);
     } catch {

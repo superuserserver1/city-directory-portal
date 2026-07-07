@@ -46,10 +46,10 @@ export function BusinessCard({ business }: { business: BusinessWithRelations }) 
 
   // Cache slug for URL navigation
   useEffect(() => {
-    if (business.id && business.slug) {
-      cacheBusinessSlug(business.id, business.slug);
+    if (business.id && business.slug && business.category?.slug) {
+      cacheBusinessSlug(business.id, business.slug, business.category.slug);
     }
-  }, [business.id, business.slug, cacheBusinessSlug]);
+  }, [business.id, business.slug, business.category?.slug, cacheBusinessSlug]);
 
   useEffect(() => {
     if (!isAuthenticated) return;

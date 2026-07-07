@@ -17,6 +17,11 @@ export type ViewType =
   | 'profile'
   | 'favorites';
 
+interface SlugCacheEntry {
+  slug: string;
+  categorySlug: string;
+}
+
 interface AppState {
   // Navigation
   currentView: ViewType;
@@ -40,8 +45,8 @@ interface AppState {
   siteSettings: SiteSettings | null;
   sharedDataLoaded: boolean;
 
-  // URL Navigation
-  businessSlugCache: Record<string, string>;
+  // URL Navigation — maps businessId → { slug, categorySlug }
+  businessSlugCache: Record<string, SlugCacheEntry>;
 
   // Actions
   setView: (view: ViewType, businessId?: string | null, categoryId?: string | null, localityId?: string | null) => void;
@@ -56,8 +61,8 @@ interface AppState {
   loadSharedData: () => Promise<void>;
   loadSettings: () => Promise<void>;
   setSiteSettings: (settings: SiteSettings) => void;
-  cacheBusinessSlug: (id: string, slug: string) => void;
-  cacheBusinessSlugs: (entries: Array<{ id: string; slug: string }>) => void;
+  cacheBusinessSlug: (id: string, slug: string, categorySlug: string) => void;
+  cacheBusinessSlugs: (entries: Array<{ id: string; slug: string; categorySlug: string }>) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -104,8 +109,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     // URL management via History API
     try {
       if (view === 'business-detail' && businessId) {
-        const cachedSlug = get().businessSlugCache[businessId];
-        if (cachedSlug) {
+        const cached = get().businessSlugCache[businessId];
+        if (cached) {
           const state = {
             v: view,
             b: businessId,
@@ -114,7 +119,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             q: get().searchQuery,
             t: get().searchType,
           };
-          window.history.pushState(state, '', `/business/${cachedSlug}`);
+          window.history.pushState(state, '', `/${cached.categorySlug}/${cached.slug}`);
         }
         // If slug not cached, BusinessDetailPage will push the URL after fetching
       } else if (view !== 'business-detail') {
@@ -198,19 +203,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSiteSettings: (settings) => set({ siteSettings: settings }),
 
-  cacheBusinessSlug: (id, slug) => {
+  cacheBusinessSlug: (id, slug, categorySlug) => {
     const cache = get().businessSlugCache;
-    if (cache[id] !== slug) {
-      set({ businessSlugCache: { ...cache, [id]: slug } });
+    const existing = cache[id];
+    if (!existing || existing.slug !== slug || existing.categorySlug !== categorySlug) {
+      set({ businessSlugCache: { ...cache, [id]: { slug, categorySlug } } });
     }
   },
 
   cacheBusinessSlugs: (entries) => {
     const cache = { ...get().businessSlugCache };
     let changed = false;
-    for (const { id, slug } of entries) {
-      if (cache[id] !== slug) {
-        cache[id] = slug;
+    for (const { id, slug, categorySlug } of entries) {
+      const existing = cache[id];
+      if (!existing || existing.slug !== slug || existing.categorySlug !== categorySlug) {
+        cache[id] = { slug, categorySlug };
         changed = true;
       }
     }
