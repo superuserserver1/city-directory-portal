@@ -57,6 +57,7 @@ model Business {
   name        String
   slug        String     @unique
   description String?
+  aboutUs     String?
   type        String     @default("BUSINESS") // BUSINESS, AMENITY
   address     String?
   phone       String?
@@ -70,25 +71,64 @@ model Business {
   isVerified  Boolean    @default(false)
   isFeatured  Boolean    @default(false)
   isActive    Boolean    @default(true)
+  status      String     @default("APPROVED") // PENDING, APPROVED, REJECTED
+  rejectionReason String?
+  facebook    String?
+  instagram   String?
+  twitter     String?
+  youtube     String?
+  whatsapp    String?
+  googleMaps  String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
   categoryId  String
   localityId  String
 
-  category   Category  @relation(fields: [categoryId], references: [id])
-  locality   Locality  @relation(fields: [localityId], references: [id])
-  owner      User?     @relation(fields: [ownerId], references: [id])
-  ownerId    String?
-  products   Product[]
-  enquiries  Enquiry[]
-  favorites  Favorite[]
-  reviews    Review[]
+  category    Category    @relation(fields: [categoryId], references: [id])
+  locality    Locality    @relation(fields: [localityId], references: [id])
+  owner       User?       @relation(fields: [ownerId], references: [id])
+  ownerId     String?
+  products    Product[]
+  images      BusinessImage[]
+  hours       BusinessHour[]
+  enquiries   Enquiry[]
+  favorites   Favorite[]
+  reviews     Review[]
 
   @@index([categoryId])
   @@index([localityId])
   @@index([type])
   @@index([slug])
+  @@index([status])
+  @@index([ownerId])
+}
+
+model BusinessImage {
+  id         String   @id @default(cuid())
+  url        String
+  caption    String?
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+model BusinessHour {
+  id         String   @id @default(cuid())
+  day        Int      // 0=Sunday, 1=Monday, ..., 6=Saturday
+  openTime   String?  // e.g. "09:00"
+  closeTime  String?  // e.g. "18:00"
+  isClosed   Boolean  @default(false)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, day])
+  @@index([businessId])
 }
 
 model Product {
@@ -96,7 +136,9 @@ model Product {
   name        String
   description String?
   price       String?
+  priceUnit   String?
   image       String?
+  images      String   @default("[]")
   type        String   @default("PRODUCT") // PRODUCT, SERVICE
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())

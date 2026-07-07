@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
       totalEnquiries,
       totalCategories,
       totalLocalities,
+      pendingBusinesses,
       recentEnquiries,
     ] = await Promise.all([
       db.user.count(),
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
       db.enquiry.count(),
       db.category.count(),
       db.locality.count(),
+      db.business.count({ where: { status: 'PENDING' } }),
       db.enquiry.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
@@ -41,6 +43,7 @@ export async function GET(request: NextRequest) {
       totalEnquiries,
       totalCategories,
       totalLocalities,
+      pendingBusinesses,
       recentEnquiries,
     });
   } catch (error) {

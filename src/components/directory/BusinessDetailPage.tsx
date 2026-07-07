@@ -6,13 +6,14 @@ import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BusinessDetailLoader } from './PageLoader';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Tooltip,
   TooltipContent,
@@ -23,9 +24,14 @@ import {
   ArrowLeft, MapPin, Phone, Mail, Globe, Star, CheckCircle2, Clock,
   Package, Wrench, Send, ShieldCheck, ExternalLink, Share2, MapPinned,
   Home, ChevronRight, PackageOpen, Heart, MessageSquare,
+  Facebook, Instagram, Youtube, Twitter, MessageCircle,
+  ImageIcon, Info, AlertCircle, XCircle,
 } from 'lucide-react';
-import type { BusinessWithRelations, Enquiry } from '@/types';
+import type { BusinessWithRelations, Enquiry, BusinessStatus } from '@/types';
 import { ReviewsSection } from './ReviewsSection';
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md' | 'lg' }) {
   const fullStars = Math.floor(rating);
@@ -54,12 +60,38 @@ function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md
   );
 }
 
+function formatTime(time: string): string {
+  if (!time) return '';
+  const [h, m] = time.split(':');
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const h12 = hour % 12 || 12;
+  return `${h12}:${m} ${ampm}`;
+}
+
+function isOpenNow(hours: { day: number; isClosed: boolean; openTime: string | null; closeTime: string | null }[]): boolean {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const todayHour = hours.find((h) => h.day === dayOfWeek);
+  if (!todayHour || todayHour.isClosed || !todayHour.openTime || !todayHour.closeTime) return false;
+
+  const [oh, om] = todayHour.openTime.split(':').map(Number);
+  const [ch, cm] = todayHour.closeTime.split(':').map(Number);
+  const openMinutes = oh * 60 + om;
+  const closeMinutes = ch * 60 + cm;
+
+  return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+}
+
 export function BusinessDetailPage() {
   const { selectedBusinessId, user, isAuthenticated, setView, cacheBusinessSlug } = useAppStore();
   const [business, setBusiness] = useState<BusinessWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isFav, setIsFav] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Enquiry form
   const [eqName, setEqName] = useState('');
@@ -117,6 +149,7 @@ export function BusinessDetailPage() {
   }, [user]);
 
   const canEdit = user?.role === 'ADMIN' || (user?.role === 'BUSINESS_OWNER' && business?.ownerId === user.id);
+  const isOwner = user?.role === 'BUSINESS_OWNER' && business?.ownerId === user.id;
 
   const handleSubmitEnquiry = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,7 +205,11 @@ export function BusinessDetailPage() {
   };
 
   const handleViewOnMap = () => {
-    toast.info('Map integration coming soon!', { description: 'We\'re working on adding interactive maps.' });
+    if (business?.googleMaps) {
+      window.open(business.googleMaps, '_blank', 'noopener,noreferrer');
+    } else {
+      toast.info('Map integration coming soon!', { description: 'We\'re working on adding interactive maps.' });
+    }
   };
 
   const toggleFavorite = async () => {
@@ -201,16 +238,32 @@ export function BusinessDetailPage() {
   const productItems = products.filter((p) => p.type === 'PRODUCT');
   const serviceItems = products.filter((p) => p.type === 'SERVICE');
   const isAmenity = business.type === 'AMENITY';
+  const galleryImages = business.images?.length ? business.images.sort((a, b) => a.order - b.order) : [];
+  const hasHours = business.hours && business.hours.length > 0;
+  const hasSocial = !!(business.facebook || business.instagram || business.twitter || business.youtube || business.whatsapp);
+  const isCurrentlyOpen = hasHours ? isOpenNow(business.hours) : undefined;
+
+  // Status for owner viewing own business
+  const statusConfig: Record<BusinessStatus, { class: string; icon: React.ElementType; label: string }> = {
+    PENDING: { class: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock, label: 'Pending Approval' },
+    APPROVED: { class: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle2, label: 'Approved' },
+    REJECTED: { class: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, label: 'Rejected' },
+  };
 
   return (
     <div className="animate-fade-in">
-      {/* Cover - dynamic gradient based on type */}
-      <div className={`relative h-48 sm:h-64 ${isAmenity ? 'gradient-cover-amenity' : 'gradient-cover-business'}`}>
+      {/* Cover - dynamic gradient based on type or actual cover image */}
+      <div className={`relative h-48 sm:h-64 ${business.coverImage ? '' : isAmenity ? 'gradient-cover-amenity' : 'gradient-cover-business'} overflow-hidden`}>
+        {business.coverImage ? (
+          <img src={business.coverImage} alt={business.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        ) : null}
         <div className="absolute inset-0 bg-black/20" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-white/15 text-[120px] sm:text-[180px] font-black select-none">{business.name.charAt(0)}</span>
-        </div>
+        {!business.coverImage && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-white/15 text-[120px] sm:text-[180px] font-black select-none">{business.name.charAt(0)}</span>
+          </div>
+        )}
         <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
           <Button
             variant="secondary"
@@ -288,12 +341,43 @@ export function BusinessDetailPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 relative z-10">
+        {/* Status alert for owner viewing their own pending/rejected business */}
+        {isOwner && business.status && business.status !== 'APPROVED' && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>
+              {business.status === 'PENDING' ? 'This listing is pending approval' : 'This listing was rejected'}
+            </AlertTitle>
+            {business.status === 'REJECTED' && business.rejectionReason && (
+              <AlertDescription className="mt-1">
+                <strong>Reason:</strong> {business.rejectionReason}
+              </AlertDescription>
+            )}
+            {business.status === 'REJECTED' && (
+              <Button size="sm" variant="outline" className="mt-3" onClick={() => setView('edit-business', business.id)}>
+                Edit & Resubmit
+              </Button>
+            )}
+          </Alert>
+        )}
+
         {/* Main Info Card */}
         <Card className="border-0 shadow-xl mb-8">
           <CardContent className="p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row gap-6">
-              <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ${isAmenity ? 'gradient-card-3' : 'gradient-card-2'} flex items-center justify-center shrink-0`}>
-                <span className="text-white/50 text-4xl sm:text-5xl font-black select-none">{business.name.charAt(0)}</span>
+              {/* Logo */}
+              <div className="shrink-0">
+                {business.logo ? (
+                  <img
+                    src={business.logo}
+                    alt={`${business.name} logo`}
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-contain bg-muted p-2 border`}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                  />
+                ) : null}
+                <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ${isAmenity ? 'gradient-card-3' : 'gradient-card-2'} flex items-center justify-center ${business.logo ? 'hidden' : ''}`}>
+                  <span className="text-white/50 text-4xl sm:text-5xl font-black select-none">{business.name.charAt(0)}</span>
+                </div>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -313,6 +397,13 @@ export function BusinessDetailPage() {
                   }>
                     {isAmenity ? 'Amenity' : 'Business'}
                   </Badge>
+                  {/* Show status for owner */}
+                  {isOwner && business.status && (
+                    <Badge variant="secondary" className={`${statusConfig[business.status].class} gap-1 border`}>
+                      {(() => { const Ic = statusConfig[business.status].icon; return <Ic className="h-3 w-3" />; })()}
+                      {statusConfig[business.status].label}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                   <Badge variant="secondary">{business.category?.name}</Badge>
@@ -383,8 +474,90 @@ export function BusinessDetailPage() {
                     </a>
                   </div>
                 )}
+                {business.whatsapp && (
+                  <div className="flex items-center gap-3">
+                    <MessageCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+                    <a
+                      href={`https://wa.me/${business.whatsapp.replace(/[^0-9+]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm hover:text-emerald-600 transition-colors flex items-center gap-1"
+                    >
+                      WhatsApp <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+            {/* Social Media Links */}
+            {hasSocial && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-primary" /> Social Media
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2.5">
+                  {business.facebook && (
+                    <a
+                      href={business.facebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
+                    >
+                      <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                        <Facebook className="h-4 w-4" />
+                      </div>
+                      <span className="text-sm font-medium">Facebook</span>
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </a>
+                  )}
+                  {business.instagram && (
+                    <a
+                      href={business.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
+                    >
+                      <div className="p-1.5 rounded-lg bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 group-hover:scale-110 transition-transform">
+                        <Instagram className="h-4 w-4" />
+                      </div>
+                      <span className="text-sm font-medium">Instagram</span>
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </a>
+                  )}
+                  {business.twitter && (
+                    <a
+                      href={business.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
+                    >
+                      <div className="p-1.5 rounded-lg bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 group-hover:scale-110 transition-transform">
+                        <Twitter className="h-4 w-4" />
+                      </div>
+                      <span className="text-sm font-medium">Twitter / X</span>
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </a>
+                  )}
+                  {business.youtube && (
+                    <a
+                      href={business.youtube}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
+                    >
+                      <div className="p-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 group-hover:scale-110 transition-transform">
+                        <Youtube className="h-4 w-4" />
+                      </div>
+                      <span className="text-sm font-medium">YouTube</span>
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </a>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Operating Hours */}
             <Card>
@@ -393,20 +566,52 @@ export function BusinessDetailPage() {
                   <Clock className="h-4 w-4 text-primary" /> Operating Hours
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Monday - Saturday</span>
-                  <span className="font-medium">9:00 AM - 8:00 PM</span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Sunday</span>
-                  <span className="font-medium">10:00 AM - 6:00 PM</span>
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Open now
-                </div>
+              <CardContent className="space-y-2">
+                {hasHours ? (
+                  <>
+                    {business.hours
+                      .sort((a, b) => a.day === 0 ? 1 : a.day - b.day)
+                      .map((h) => {
+                        const dayName = DAY_NAMES[h.day];
+                        const isToday = new Date().getDay() === h.day;
+                        return (
+                          <div key={h.day} className={`flex items-center justify-between text-sm py-1 ${isToday ? 'font-medium text-foreground' : ''}`}>
+                            <span className={isToday ? '' : 'text-muted-foreground'}>
+                              {dayName}
+                              {isToday && <span className="text-xs text-primary ml-1.5">(Today)</span>}
+                            </span>
+                            <span className={h.isClosed ? 'text-muted-foreground' : ''}>
+                              {h.isClosed ? 'Closed' : `${formatTime(h.openTime!)} - ${formatTime(h.closeTime!)}`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    {isCurrentlyOpen !== undefined && (
+                      <div className="mt-2 pt-2 border-t flex items-center gap-2 text-xs">
+                        <div className={`w-2 h-2 rounded-full ${isCurrentlyOpen ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                        <span className={isCurrentlyOpen ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-red-600 dark:text-red-400'}>
+                          {isCurrentlyOpen ? 'Open now' : 'Currently closed'}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Monday - Saturday</span>
+                      <span className="font-medium">9:00 AM - 8:00 PM</span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Sunday</span>
+                      <span className="font-medium">10:00 AM - 6:00 PM</span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Default hours
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -417,8 +622,8 @@ export function BusinessDetailPage() {
               onClick={handleViewOnMap}
             >
               <MapPinned className="h-4 w-4 text-primary" />
-              View on Map
-              <span className="ml-auto text-xs text-muted-foreground">Coming Soon</span>
+              {business.googleMaps ? 'View on Google Maps' : 'View on Map'}
+              {!business.googleMaps && <span className="ml-auto text-xs text-muted-foreground">Coming Soon</span>}
             </Button>
 
             {/* Quick Enquiry */}
@@ -469,15 +674,21 @@ export function BusinessDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="products" className="w-full">
-              <TabsList className="w-full justify-start">
+              <TabsList className="w-full justify-start flex-wrap">
                 <TabsTrigger value="products" className="gap-1.5">
                   <Package className="h-4 w-4" /> Products & Services
                 </TabsTrigger>
+                {galleryImages.length > 0 && (
+                  <TabsTrigger value="gallery" className="gap-1.5">
+                    <ImageIcon className="h-4 w-4" /> Gallery
+                    <Badge variant="secondary" className="text-[10px]">{galleryImages.length}</Badge>
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="about" className="gap-1.5">
+                  <Info className="h-4 w-4" /> About
+                </TabsTrigger>
                 <TabsTrigger value="reviews" className="gap-1.5">
                   <MessageSquare className="h-4 w-4" /> Reviews
-                </TabsTrigger>
-                <TabsTrigger value="about" className="gap-1.5">
-                  <Clock className="h-4 w-4" /> About
                 </TabsTrigger>
               </TabsList>
 
@@ -501,18 +712,26 @@ export function BusinessDetailPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-children">
                           {productItems.map((p) => (
                             <Card key={p.id} className="overflow-hidden group hover:shadow-lg transition-shadow duration-200 shimmer-effect">
-                              <div className={`relative h-28 ${getGradient(p.id)} flex items-center justify-center`}>
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                                <Package className="h-10 w-10 text-white/30 relative z-10" />
-                                <Badge className="absolute top-2.5 left-2.5 bg-white/20 text-white border-white/20 backdrop-blur-sm text-[10px]">
-                                  Product
-                                </Badge>
-                              </div>
+                              {p.image ? (
+                                <div className="relative h-28">
+                                  <img src={p.image} alt={p.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                  <Badge className="absolute top-2.5 left-2.5 bg-white/20 text-white border-white/20 backdrop-blur-sm text-[10px]">
+                                    Product
+                                  </Badge>
+                                </div>
+                              ) : (
+                                <div className={`relative h-28 ${getGradient(p.id)} flex items-center justify-center`}>
+                                  <Package className="h-10 w-10 text-white/30 relative z-10" />
+                                  <Badge className="absolute top-2.5 left-2.5 bg-white/20 text-white border-white/20 backdrop-blur-sm text-[10px]">
+                                    Product
+                                  </Badge>
+                                </div>
+                              )}
                               <CardContent className="p-4 pt-5">
                                 <h4 className="font-semibold group-hover:text-primary transition-colors">{p.name}</h4>
                                 {p.description && <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{p.description}</p>}
                                 {p.price && (
-                                  <p className="text-primary font-bold mt-3 text-lg">{p.price}</p>
+                                  <p className="text-primary font-bold mt-3 text-lg">{p.price}{p.priceUnit ? ` / ${p.priceUnit}` : ''}</p>
                                 )}
                               </CardContent>
                             </Card>
@@ -529,18 +748,26 @@ export function BusinessDetailPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-children">
                           {serviceItems.map((s) => (
                             <Card key={s.id} className="overflow-hidden group hover:shadow-lg transition-shadow duration-200 shimmer-effect">
-                              <div className={`relative h-28 ${getGradient(s.id)} flex items-center justify-center`}>
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                                <Wrench className="h-10 w-10 text-white/30 relative z-10" />
-                                <Badge className="absolute top-2.5 left-2.5 bg-white/20 text-white border-white/20 backdrop-blur-sm text-[10px]">
-                                  Service
-                                </Badge>
-                              </div>
+                              {s.image ? (
+                                <div className="relative h-28">
+                                  <img src={s.image} alt={s.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                  <Badge className="absolute top-2.5 left-2.5 bg-white/20 text-white border-white/20 backdrop-blur-sm text-[10px]">
+                                    Service
+                                  </Badge>
+                                </div>
+                              ) : (
+                                <div className={`relative h-28 ${getGradient(s.id)} flex items-center justify-center`}>
+                                  <Wrench className="h-10 w-10 text-white/30 relative z-10" />
+                                  <Badge className="absolute top-2.5 left-2.5 bg-white/20 text-white border-white/20 backdrop-blur-sm text-[10px]">
+                                    Service
+                                  </Badge>
+                                </div>
+                              )}
                               <CardContent className="p-4 pt-5">
                                 <h4 className="font-semibold group-hover:text-primary transition-colors">{s.name}</h4>
                                 {s.description && <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{s.description}</p>}
                                 {s.price && (
-                                  <p className="text-primary font-bold mt-3 text-lg">{s.price}</p>
+                                  <p className="text-primary font-bold mt-3 text-lg">{s.price}{s.priceUnit ? ` / ${s.priceUnit}` : ''}</p>
                                 )}
                               </CardContent>
                             </Card>
@@ -552,20 +779,89 @@ export function BusinessDetailPage() {
                 )}
               </TabsContent>
 
-              <TabsContent value="reviews" className="mt-6">
-                <ReviewsSection businessId={business.id} />
-              </TabsContent>
+              {/* Gallery Tab */}
+              {galleryImages.length > 0 && (
+                <TabsContent value="gallery" className="mt-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <ImageIcon className="h-5 w-5 text-primary" /> Photo Gallery
+                      </CardTitle>
+                      <CardDescription>{galleryImages.length} photo{galleryImages.length !== 1 ? 's' : ''}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {/* Main Image */}
+                      <div className="rounded-xl overflow-hidden border mb-4 bg-muted">
+                        <img
+                          src={galleryImages[galleryIndex]?.url}
+                          alt={galleryImages[galleryIndex]?.caption || `Gallery image ${galleryIndex + 1}`}
+                          className="w-full max-h-[400px] object-contain"
+                          onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
+                        />
+                      </div>
+                      {galleryImages[galleryIndex]?.caption && (
+                        <p className="text-sm text-muted-foreground text-center mb-4">{galleryImages[galleryIndex].caption}</p>
+                      )}
+                      {/* Thumbnails */}
+                      {galleryImages.length > 1 && (
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                          {galleryImages.map((img, i) => (
+                            <button
+                              key={img.id}
+                              onClick={() => setGalleryIndex(i)}
+                              className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                                i === galleryIndex ? 'border-primary' : 'border-transparent hover:border-muted-foreground/30'
+                              }`}
+                            >
+                              <img
+                                src={img.url}
+                                alt={img.caption || `Thumbnail ${i + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
 
+              {/* About Tab */}
               <TabsContent value="about" className="mt-6">
                 <Card>
-                  <CardContent className="p-6">
-                    <h3 className="font-semibold text-lg mb-3">About {business.name}</h3>
-                    {business.description ? (
-                      <p className="text-muted-foreground leading-relaxed">{business.description}</p>
-                    ) : (
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Info className="h-5 w-5 text-primary" /> About {business.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* About Us */}
+                    {business.aboutUs && (
+                      <div>
+                        <h3 className="font-semibold mb-2 flex items-center gap-2">
+                          <Info className="h-4 w-4 text-primary" /> About Us
+                        </h3>
+                        <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{business.aboutUs}</p>
+                      </div>
+                    )}
+
+                    {/* Description (if no aboutUs) */}
+                    {!business.aboutUs && business.description && (
+                      <div>
+                        <h3 className="font-semibold mb-2">Description</h3>
+                        <p className="text-muted-foreground leading-relaxed">{business.description}</p>
+                      </div>
+                    )}
+
+                    {!business.aboutUs && !business.description && (
                       <p className="text-muted-foreground">No description available yet.</p>
                     )}
-                    <Separator className="my-4" />
+
+                    <Separator />
+
+                    {/* Details Grid */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground">Category</p>
@@ -595,6 +891,10 @@ export function BusinessDetailPage() {
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="reviews" className="mt-6">
+                <ReviewsSection businessId={business.id} />
               </TabsContent>
             </Tabs>
           </div>

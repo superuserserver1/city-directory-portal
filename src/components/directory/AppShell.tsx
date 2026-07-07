@@ -11,10 +11,11 @@ import { HomePage } from '@/components/directory/HomePage';
 import { BrowsePage } from '@/components/directory/BrowsePage';
 import { BusinessDetailPage } from '@/components/directory/BusinessDetailPage';
 import { LoginPage, RegisterPage } from '@/components/directory/AuthPages';
+import { BusinessOwnerRegisterPage } from '@/components/directory/BusinessOwnerRegisterPage';
 import { AdminDashboard } from '@/components/directory/AdminDashboard';
 import { OwnerDashboard } from '@/components/directory/OwnerDashboard';
 import { VisitorDashboard } from '@/components/directory/VisitorDashboard';
-import { BusinessForm } from '@/components/directory/BusinessForm';
+import { BusinessListingForm } from '@/components/directory/BusinessListingForm';
 import { ProfilePage } from '@/components/directory/ProfilePage';
 import { FavoritesPage } from '@/components/directory/FavoritesPage';
 import { SearchResultsPage } from '@/components/directory/SearchResultsPage';
@@ -37,7 +38,7 @@ function BusinessFormWrapper() {
 
   return (
     <div className="animate-fade-in">
-      <div className="max-w-2xl mx-auto px-4 pt-6">
+      <div className="max-w-3xl mx-auto px-4 pt-6">
         <Button
           variant="ghost"
           size="sm"
@@ -46,7 +47,7 @@ function BusinessFormWrapper() {
           <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Dashboard
         </Button>
       </div>
-      <BusinessForm isAdmin={isAdmin} onSuccess={handleSuccess} />
+      <BusinessListingForm isAdmin={isAdmin} onSuccess={handleSuccess} />
     </div>
   );
 }
@@ -62,7 +63,7 @@ function EditBusinessWrapper() {
 
   return (
     <div className="animate-fade-in">
-      <div className="max-w-2xl mx-auto px-4 pt-6">
+      <div className="max-w-3xl mx-auto px-4 pt-6">
         <Button
           variant="ghost"
           size="sm"
@@ -71,7 +72,7 @@ function EditBusinessWrapper() {
           <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Dashboard
         </Button>
       </div>
-      <BusinessForm businessId={selectedBusinessId || undefined} isAdmin={isAdmin} onSuccess={handleSuccess} />
+      <BusinessListingForm businessId={selectedBusinessId || undefined} isAdmin={isAdmin} onSuccess={handleSuccess} />
     </div>
   );
 }
@@ -196,6 +197,7 @@ export function AppShell({ initialBusinessId, initialSlug, initialCategorySlug }
       case 'favorites': return 'Loading favorites...';
       case 'profile': return 'Loading profile...';
       case 'add-business': case 'edit-business': return 'Loading form...';
+      case 'owner-register': return 'Loading registration...';
       default: return 'Loading...';
     }
   }, [currentView]);
@@ -207,6 +209,7 @@ export function AppShell({ initialBusinessId, initialSlug, initialCategorySlug }
       case 'business-detail': return <BusinessDetailPage />;
       case 'login': return <LoginPage />;
       case 'register': return <RegisterPage />;
+      case 'owner-register': return <BusinessOwnerRegisterPage />;
       case 'admin-dashboard': return <AdminDashboard />;
       case 'owner-dashboard': return <OwnerDashboard />;
       case 'visitor-dashboard': return <VisitorDashboard />;

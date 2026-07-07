@@ -31,11 +31,32 @@ export interface Locality {
   _count?: { businesses: number };
 }
 
+export type BusinessStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface BusinessHour {
+  id: string;
+  day: number; // 0=Sunday, 1=Monday, ..., 6=Saturday
+  openTime: string | null;
+  closeTime: string | null;
+  isClosed: boolean;
+  businessId: string;
+}
+
+export interface BusinessImage {
+  id: string;
+  url: string;
+  caption?: string;
+  order: number;
+  businessId: string;
+  createdAt: string;
+}
+
 export interface Business {
   id: string;
   name: string;
   slug: string;
   description?: string;
+  aboutUs?: string;
   type: 'BUSINESS' | 'AMENITY';
   address?: string;
   phone?: string;
@@ -49,6 +70,14 @@ export interface Business {
   isVerified: boolean;
   isFeatured: boolean;
   isActive: boolean;
+  status: BusinessStatus;
+  rejectionReason?: string;
+  facebook?: string;
+  instagram?: string;
+  twitter?: string;
+  youtube?: string;
+  whatsapp?: string;
+  googleMaps?: string;
   categoryId: string;
   localityId: string;
   ownerId?: string;
@@ -61,6 +90,8 @@ export interface BusinessWithRelations extends Business {
   locality: Locality;
   owner?: Pick<User, 'id' | 'name' | 'email' | 'phone'> | null;
   products: Product[];
+  images: BusinessImage[];
+  hours: BusinessHour[];
 }
 
 export interface Product {
@@ -68,7 +99,9 @@ export interface Product {
   name: string;
   description?: string;
   price?: string;
+  priceUnit?: string;
   image?: string;
+  images: string;
   type: 'PRODUCT' | 'SERVICE';
   isActive: boolean;
   businessId: string;
@@ -127,6 +160,7 @@ export interface DashboardStats {
   totalEnquiries: number;
   totalCategories: number;
   totalLocalities: number;
+  pendingBusinesses: number;
   recentEnquiries: EnquiryWithRelations[];
 }
 

@@ -27,7 +27,26 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, description, price, image, type, isActive } = body;
+    const { name, description, price, priceUnit, image, images, type, isActive } = body;
+
+    // Validate images if provided
+    if (images !== undefined) {
+      if (Array.isArray(images)) {
+        // Valid
+      } else if (typeof images === 'string') {
+        try {
+          JSON.parse(images);
+        } catch {
+          return NextResponse.json({ error: 'images must be a valid JSON array or array of strings', requestId }, { status: 400 });
+        }
+      } else {
+        return NextResponse.json({ error: 'images must be an array or JSON string', requestId }, { status: 400 });
+      }
+    }
+
+    const imagesValue = images !== undefined
+      ? (typeof images === 'string' ? images : JSON.stringify(images))
+      : undefined;
 
     const updated = await db.product.update({
       where: { id },
@@ -35,7 +54,9 @@ export async function PUT(
         ...(name !== undefined && { name: sanitizeString(name, 200) }),
         ...(description !== undefined && { description: sanitizeString(description, 1000) }),
         ...(price !== undefined && { price: sanitizeString(price, 50) }),
+        ...(priceUnit !== undefined && { priceUnit: priceUnit ? sanitizeString(priceUnit, 50) : null }),
         ...(image !== undefined && { image }),
+        ...(imagesValue !== undefined && { images: imagesValue }),
         ...(type !== undefined && { type }),
         ...(isActive !== undefined && { isActive }),
       },

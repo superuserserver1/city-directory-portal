@@ -47,10 +47,28 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { name, description, price, image, type, isActive } = body;
+    const { name, description, price, priceUnit, image, images, type, isActive } = body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json({ error: 'Product name is required', requestId }, { status: 400 });
+    }
+
+    // Validate images is a JSON-stringifiable array if provided
+    let imagesJson = '[]';
+    if (images !== undefined) {
+      if (Array.isArray(images)) {
+        imagesJson = JSON.stringify(images);
+      } else if (typeof images === 'string') {
+        // Validate it's valid JSON
+        try {
+          JSON.parse(images);
+          imagesJson = images;
+        } catch {
+          return NextResponse.json({ error: 'images must be a valid JSON array or array of strings', requestId }, { status: 400 });
+        }
+      } else {
+        return NextResponse.json({ error: 'images must be an array or JSON string', requestId }, { status: 400 });
+      }
     }
 
     const product = await db.product.create({
@@ -58,7 +76,9 @@ export async function POST(
         name: sanitizeString(name, 200),
         description: description ? sanitizeString(description, 1000) : null,
         price: price ? sanitizeString(price, 50) : null,
+        priceUnit: priceUnit ? sanitizeString(priceUnit, 50) : null,
         image: image || null,
+        images: imagesJson,
         type: type || 'PRODUCT',
         isActive: isActive !== undefined ? isActive : true,
         businessId,

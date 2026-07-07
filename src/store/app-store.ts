@@ -9,6 +9,7 @@ export type ViewType =
   | 'search-results'
   | 'login'
   | 'register'
+  | 'owner-register'
   | 'admin-dashboard'
   | 'owner-dashboard'
   | 'visitor-dashboard'

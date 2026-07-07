@@ -12,16 +12,57 @@ export async function GET(request: NextRequest) {
     const localityId = searchParams.get('localityId');
     const type = searchParams.get('type');
     const isFeatured = searchParams.get('isFeatured');
+    const statusFilter = searchParams.get('status');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = Math.min(parseInt(searchParams.get('limit') || '12'), 100);
 
+    // Determine user role for access control
+    const { user } = extractUserFromRequest(request);
+    const userRole = user?.role;
+    const userId = user?.userId;
+
     const where: Record<string, unknown> = { isActive: true };
 
+    // Role-based status filtering
+    if (isAdmin(userRole)) {
+      // Admin can see everything, optional status filter
+      if (statusFilter) {
+        where.status = statusFilter;
+      }
+    } else if (isBusinessOwner(userRole) && userId) {
+      // Business owner can see their own PENDING + all APPROVED
+      if (statusFilter) {
+        where.status = statusFilter;
+      } else {
+        where.OR = [
+          { status: 'APPROVED' },
+          { status: 'PENDING', ownerId: userId },
+        ];
+      }
+    } else {
+      // Visitors only see APPROVED
+      where.status = 'APPROVED';
+    }
+
     if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { description: { contains: search } },
-      ];
+      const searchClause = {
+        OR: [
+          { name: { contains: search } },
+          { description: { contains: search } },
+        ],
+      };
+      if (where.OR && Array.isArray(where.OR)) {
+        // Merge search into existing OR (for business owners)
+        // We need a more complex where clause
+        const existingOr = where.OR;
+        delete where.OR;
+        where.AND = [
+          { OR: existingOr },
+          searchClause,
+        ];
+      } else {
+        where.OR = searchClause.OR;
+      }
     }
     if (categoryId) where.categoryId = categoryId;
     if (localityId) where.localityId = localityId;
@@ -39,6 +80,9 @@ export async function GET(request: NextRequest) {
         include: {
           category: { select: { id: true, name: true, slug: true, icon: true } },
           locality: { select: { id: true, name: true, slug: true } },
+          owner: {
+            select: { id: true, name: true, email: true },
+          },
           _count: {
             select: { products: true, enquiries: true },
           },
@@ -73,9 +117,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      name, slug, description, type, address, phone, email, website,
+      name, slug, description, aboutUs, type, address, phone, email, website,
       lat, lng, logo, coverImage, rating, isVerified, isFeatured,
-      isActive, categoryId, localityId, ownerId,
+      categoryId, localityId, ownerId,
+      facebook, instagram, twitter, youtube, whatsapp, googleMaps,
+      hours, images,
     } = body;
 
     // Validate required fields
@@ -110,13 +156,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Determine status based on role
+    const isOwnerCreating = !isAdmin(user!.role);
+    const businessStatus = isOwnerCreating ? 'PENDING' : 'APPROVED';
+    const businessIsActive = isOwnerCreating ? false : true;
+
     const sanitizedName = sanitizeString(name, 200);
     const sanitizedSlug = sanitizeString(slug, 200);
     const sanitizedDescription = description ? sanitizeString(description, 2000) : null;
+    const sanitizedAboutUs = aboutUs ? sanitizeString(aboutUs, 5000) : null;
     const sanitizedAddress = address ? sanitizeString(address, 500) : null;
     const sanitizedPhone = phone ? sanitizeString(phone, 20) : null;
     const sanitizedEmail = email ? sanitizeString(email, 254) : null;
     const sanitizedWebsite = website ? sanitizeString(website, 500) : null;
+    const sanitizedFacebook = facebook ? sanitizeString(facebook, 500) : null;
+    const sanitizedInstagram = instagram ? sanitizeString(instagram, 500) : null;
+    const sanitizedTwitter = twitter ? sanitizeString(twitter, 500) : null;
+    const sanitizedYoutube = youtube ? sanitizeString(youtube, 500) : null;
+    const sanitizedWhatsapp = whatsapp ? sanitizeString(whatsapp, 50) : null;
+    const sanitizedGoogleMaps = googleMaps ? sanitizeString(googleMaps, 1000) : null;
 
     const existing = await db.business.findUnique({ where: { slug: sanitizedSlug } });
     if (existing) {
@@ -128,6 +186,7 @@ export async function POST(request: NextRequest) {
         name: sanitizedName,
         slug: sanitizedSlug,
         description: sanitizedDescription,
+        aboutUs: sanitizedAboutUs,
         type: type || 'BUSINESS',
         address: sanitizedAddress,
         phone: sanitizedPhone,
@@ -140,14 +199,58 @@ export async function POST(request: NextRequest) {
         rating: rating || 0,
         isVerified: isVerified || false,
         isFeatured: isFeatured || false,
-        isActive: isActive !== undefined ? isActive : true,
+        isActive: businessIsActive,
+        status: businessStatus,
         categoryId,
         localityId,
         ownerId: ownerId || user!.userId,
+        facebook: sanitizedFacebook,
+        instagram: sanitizedInstagram,
+        twitter: sanitizedTwitter,
+        youtube: sanitizedYoutube,
+        whatsapp: sanitizedWhatsapp,
+        googleMaps: sanitizedGoogleMaps,
       },
     });
 
-    return NextResponse.json({ business }, { status: 201 });
+    // Create business hours if provided
+    if (Array.isArray(hours) && hours.length > 0) {
+      await db.businessHour.createMany({
+        data: hours.map((h: { day: number; openTime?: string; closeTime?: string; isClosed?: boolean }) => ({
+          businessId: business.id,
+          day: h.day,
+          openTime: h.openTime || null,
+          closeTime: h.closeTime || null,
+          isClosed: h.isClosed !== undefined ? h.isClosed : false,
+        })),
+      });
+    }
+
+    // Create business images if provided
+    if (Array.isArray(images) && images.length > 0) {
+      await db.businessImage.createMany({
+        data: images.map((img: { url: string; caption?: string; order?: number }, idx: number) => ({
+          businessId: business.id,
+          url: sanitizeString(img.url, 1000),
+          caption: img.caption ? sanitizeString(img.caption, 200) : null,
+          order: img.order !== undefined ? img.order : idx,
+        })),
+      });
+    }
+
+    // Fetch the complete business with relations
+    const createdBusiness = await db.business.findUnique({
+      where: { id: business.id },
+      include: {
+        category: { select: { id: true, name: true, slug: true, icon: true } },
+        locality: { select: { id: true, name: true, slug: true } },
+        owner: { select: { id: true, name: true, email: true } },
+        images: { orderBy: { order: 'asc' } },
+        hours: { orderBy: { day: 'asc' } },
+      },
+    });
+
+    return NextResponse.json({ business: createdBusiness }, { status: 201 });
   } catch (error) {
     console.error(`Create business error [${requestId}]:`, error);
     if (isPrismaUniqueError(error)) {

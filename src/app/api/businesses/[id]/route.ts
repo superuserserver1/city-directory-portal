@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { extractUserFromRequest, isAdmin, isBusinessOwner } from '@/lib/auth';
-import { generateRequestId, safeErrorResponse, isPrismaNotFoundError } from '@/lib/validation';
+import { generateRequestId, safeErrorResponse, isPrismaNotFoundError, sanitizeString } from '@/lib/validation';
 
 export async function GET(
   request: NextRequest,
@@ -10,6 +10,11 @@ export async function GET(
   const requestId = generateRequestId();
   try {
     const { id } = await params;
+
+    // Determine user role for access control
+    const { user } = extractUserFromRequest(request);
+    const userRole = user?.role;
+    const userId = user?.userId;
 
     const business = await db.business.findUnique({
       where: { id },
@@ -23,14 +28,27 @@ export async function GET(
           where: { isActive: true },
           orderBy: { createdAt: 'desc' },
         },
+        images: {
+          orderBy: { order: 'asc' },
+        },
+        hours: {
+          orderBy: { day: 'asc' },
+        },
         _count: {
-          select: { enquiries: true },
+          select: { enquiries: true, reviews: true, favorites: true },
         },
       },
     });
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found', requestId }, { status: 404 });
+    }
+
+    // Access control: non-approved businesses are only visible to owner or admin
+    if (business.status !== 'APPROVED') {
+      if (!isAdmin(userRole) && !(isBusinessOwner(userRole) && business.ownerId === userId)) {
+        return NextResponse.json({ error: 'Business not found', requestId }, { status: 404 });
+      }
     }
 
     return NextResponse.json({ business });
@@ -62,32 +80,68 @@ export async function PUT(
     }
 
     const {
-      name, slug, description, type, address, phone, email, website,
+      name, slug, description, aboutUs, type, address, phone, email, website,
       lat, lng, logo, coverImage, rating, isVerified, isFeatured,
       isActive, categoryId, localityId,
+      facebook, instagram, twitter, youtube, whatsapp, googleMaps,
+      status, rejectionReason,
     } = body;
+
+    // Only admin can change status and rejectionReason
+    const updateData: Record<string, unknown> = {
+      ...(name !== undefined && { name: sanitizeString(name, 200) }),
+      ...(slug !== undefined && { slug: sanitizeString(slug, 200) }),
+      ...(description !== undefined && { description: description ? sanitizeString(description, 2000) : null }),
+      ...(aboutUs !== undefined && { aboutUs: aboutUs ? sanitizeString(aboutUs, 5000) : null }),
+      ...(type !== undefined && { type }),
+      ...(address !== undefined && { address: address ? sanitizeString(address, 500) : null }),
+      ...(phone !== undefined && { phone: phone ? sanitizeString(phone, 20) : null }),
+      ...(email !== undefined && { email: email ? sanitizeString(email, 254) : null }),
+      ...(website !== undefined && { website: website ? sanitizeString(website, 500) : null }),
+      ...(lat !== undefined && { lat }),
+      ...(lng !== undefined && { lng }),
+      ...(logo !== undefined && { logo }),
+      ...(coverImage !== undefined && { coverImage }),
+      ...(rating !== undefined && { rating }),
+      ...(isVerified !== undefined && { isVerified }),
+      ...(isFeatured !== undefined && { isFeatured }),
+      ...(isActive !== undefined && { isActive }),
+      ...(categoryId !== undefined && { categoryId }),
+      ...(localityId !== undefined && { localityId }),
+      ...(facebook !== undefined && { facebook: facebook ? sanitizeString(facebook, 500) : null }),
+      ...(instagram !== undefined && { instagram: instagram ? sanitizeString(instagram, 500) : null }),
+      ...(twitter !== undefined && { twitter: twitter ? sanitizeString(twitter, 500) : null }),
+      ...(youtube !== undefined && { youtube: youtube ? sanitizeString(youtube, 500) : null }),
+      ...(whatsapp !== undefined && { whatsapp: whatsapp ? sanitizeString(whatsapp, 50) : null }),
+      ...(googleMaps !== undefined && { googleMaps: googleMaps ? sanitizeString(googleMaps, 1000) : null }),
+    };
+
+    // Admin-only fields
+    if (isAdmin(user!.role)) {
+      if (status !== undefined) {
+        updateData.status = status;
+        // Auto-set isActive based on status
+        if (status === 'APPROVED') {
+          updateData.isActive = true;
+          updateData.rejectionReason = null;
+        } else if (status === 'REJECTED') {
+          updateData.rejectionReason = rejectionReason || null;
+        }
+      }
+      if (rejectionReason !== undefined && status === undefined) {
+        updateData.rejectionReason = rejectionReason ? sanitizeString(rejectionReason, 1000) : null;
+      }
+    }
 
     const business = await db.business.update({
       where: { id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(slug !== undefined && { slug }),
-        ...(description !== undefined && { description }),
-        ...(type !== undefined && { type }),
-        ...(address !== undefined && { address }),
-        ...(phone !== undefined && { phone }),
-        ...(email !== undefined && { email }),
-        ...(website !== undefined && { website }),
-        ...(lat !== undefined && { lat }),
-        ...(lng !== undefined && { lng }),
-        ...(logo !== undefined && { logo }),
-        ...(coverImage !== undefined && { coverImage }),
-        ...(rating !== undefined && { rating }),
-        ...(isVerified !== undefined && { isVerified }),
-        ...(isFeatured !== undefined && { isFeatured }),
-        ...(isActive !== undefined && { isActive }),
-        ...(categoryId !== undefined && { categoryId }),
-        ...(localityId !== undefined && { localityId }),
+      data: updateData,
+      include: {
+        category: { select: { id: true, name: true, slug: true, icon: true } },
+        locality: { select: { id: true, name: true, slug: true } },
+        owner: { select: { id: true, name: true, email: true } },
+        images: { orderBy: { order: 'asc' } },
+        hours: { orderBy: { day: 'asc' } },
       },
     });
 
@@ -109,11 +163,19 @@ export async function DELETE(
   try {
     const { user, error } = extractUserFromRequest(request);
     if (error) return error;
-    if (!isAdmin(user!.role)) {
-      return NextResponse.json({ error: 'Admin access required', requestId }, { status: 403 });
-    }
 
     const { id } = await params;
+
+    const existing = await db.business.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: 'Business not found', requestId }, { status: 404 });
+    }
+
+    // Allow admin to delete any, or owner to delete their own
+    if (!isAdmin(user!.role) && existing.ownerId !== user!.userId) {
+      return NextResponse.json({ error: 'You can only delete your own businesses', requestId }, { status: 403 });
+    }
+
     await db.business.delete({ where: { id } });
 
     return NextResponse.json({ message: 'Business deleted' });

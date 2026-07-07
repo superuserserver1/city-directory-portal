@@ -17,21 +17,29 @@ import {
 } from '@/components/ui/table';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Building2, MessageSquare, Plus, Pencil, Trash2, Send, Clock, Eye,
   CheckCircle2, ArrowLeft, Package, Wrench, TrendingUp, TrendingDown,
-  Briefcase, Inbox, MessageCircle,
+  Briefcase, Inbox, MessageCircle, AlertCircle, XCircle, Loader2,
 } from 'lucide-react';
 import { ChatPanel } from './ChatPanel';
-import type { Business, BusinessWithRelations, Category, Locality, Product, EnquiryWithRelations, Message } from '@/types';
+import type { Business, BusinessWithRelations, Category, Locality, Product, EnquiryWithRelations, Message, BusinessStatus } from '@/types';
 
-const STATUS_STYLES: Record<string, { class: string; icon: React.ElementType; label: string }> = {
+const ENQUIRY_STATUS_STYLES: Record<string, { class: string; icon: React.ElementType; label: string }> = {
   OPEN: { class: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock, label: 'Open' },
   IN_PROGRESS: { class: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Eye, label: 'In Progress' },
   CLOSED: { class: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle2, label: 'Closed' },
+};
+
+const BIZ_STATUS_STYLES: Record<BusinessStatus, { class: string; icon: React.ElementType; label: string }> = {
+  PENDING: { class: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800', icon: Clock, label: 'Pending Approval' },
+  APPROVED: { class: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800', icon: CheckCircle2, label: 'Approved' },
+  REJECTED: { class: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800', icon: XCircle, label: 'Rejected' },
 };
 
 function formatDateSeparator(dateStr: string) {
@@ -110,20 +118,6 @@ function ChatMessages({ messages, userId, messagesEndRef }: { messages: Message[
   );
 }
 
-function TypingIndicator() {
-  return (
-    <div className="flex justify-start">
-      <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
-        <div className="flex items-center gap-1">
-          <span className="typing-dot w-2 h-2 rounded-full bg-muted-foreground/50 inline-block" />
-          <span className="typing-dot w-2 h-2 rounded-full bg-muted-foreground/50 inline-block" />
-          <span className="typing-dot w-2 h-2 rounded-full bg-muted-foreground/50 inline-block" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MessageInput({ value, onChange, onSend, disabled, sendingMsg }: {
   value: string; onChange: (v: string) => void; onSend: () => void; disabled: boolean; sendingMsg: boolean;
 }) {
@@ -176,7 +170,6 @@ export function OwnerDashboard() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMsg, setNewMsg] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
-  const [showTyping, setShowTyping] = useState(false);
   const [chatEnquiry, setChatEnquiry] = useState<EnquiryWithRelations | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -238,7 +231,7 @@ export function OwnerDashboard() {
     }
   };
 
-  const updateStatus = async (id: string, status: string) => {
+  const updateEnquiryStatus = async (id: string, status: string) => {
     try {
       await api.put(`/api/enquiries/${id}`, { status });
       toast.success('Status updated');
@@ -249,14 +242,28 @@ export function OwnerDashboard() {
     } catch { toast.error('Failed to update'); }
   };
 
+  const handleDeleteBusiness = async (bizId: string) => {
+    try {
+      await api.del(`/api/businesses/${bizId}`);
+      toast.success('Business deleted');
+      refresh();
+    } catch {
+      toast.error('Failed to delete business');
+    }
+  };
+
+  const handleEditBusiness = (bizId: string) => {
+    setView('edit-business', bizId);
+  };
+
   const openEnquiries = enquiries.filter((e) => e.status === 'OPEN').length;
   const totalEnq = enquiries.length;
-  const closedEnq = enquiries.filter((e) => e.status === 'CLOSED').length;
+  const pendingBizCount = businesses.filter((b) => b.status === 'PENDING').length;
 
   const statCardData = [
-    { icon: Building2, label: 'My Businesses', value: businesses.length, trend: '+2', trendUp: true, gradient: 'from-teal-500 to-emerald-500' },
-    { icon: MessageSquare, label: 'Total Enquiries', value: totalEnq, trend: '+5', trendUp: true, gradient: 'from-emerald-500 to-teal-600' },
-    { icon: Clock, label: 'Open', value: openEnquiries, trend: '-1', trendUp: false, gradient: 'from-teal-600 to-cyan-600' },
+    { icon: Building2, label: 'My Businesses', value: businesses.length, trend: `+${pendingBizCount} pending`, trendUp: pendingBizCount > 0, gradient: 'from-teal-500 to-emerald-500' },
+    { icon: MessageSquare, label: 'Total Enquiries', value: totalEnq, trend: `${openEnquiries} open`, trendUp: openEnquiries > 0, gradient: 'from-emerald-500 to-teal-600' },
+    { icon: Clock, label: 'Open Enquiries', value: openEnquiries, trend: '-1', trendUp: false, gradient: 'from-teal-600 to-cyan-600' },
   ];
 
   return (
@@ -333,7 +340,7 @@ export function OwnerDashboard() {
                     ) : (
                       <div className="space-y-2">
                         {enquiries.map((eq) => {
-                          const st = STATUS_STYLES[eq.status] || STATUS_STYLES.OPEN;
+                          const st = ENQUIRY_STATUS_STYLES[eq.status] || ENQUIRY_STATUS_STYLES.OPEN;
                           const StIcon = st.icon;
                           return (
                             <div
@@ -386,7 +393,7 @@ export function OwnerDashboard() {
                     {selectedEnquiry && (
                       <Select
                         value={selectedEnquiry.status}
-                        onValueChange={(v) => updateStatus(selectedEnquiry.id, v)}
+                        onValueChange={(v) => updateEnquiryStatus(selectedEnquiry.id, v)}
                       >
                         <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -441,7 +448,9 @@ export function OwnerDashboard() {
           <TabsContent value="businesses" className="mt-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">My Businesses ({businesses.length})</h2>
-              <BusinessFormDialog categories={[]} localities={[]} onRefresh={refresh} />
+              <Button size="sm" onClick={() => setView('add-business')}>
+                <Plus className="h-4 w-4 mr-1.5" /> Add Business
+              </Button>
             </div>
             {businesses.length === 0 ? (
               <Card><CardContent className="py-12 text-center">
@@ -454,7 +463,13 @@ export function OwnerDashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {businesses.map((biz) => (
-                  <BusinessManagementCard key={biz.id} business={biz} onRefresh={refresh} />
+                  <BusinessManagementCard
+                    key={biz.id}
+                    business={biz}
+                    onRefresh={refresh}
+                    onEdit={handleEditBusiness}
+                    onDelete={handleDeleteBusiness}
+                  />
                 ))}
               </div>
             )}
@@ -488,17 +503,24 @@ function EnhancedStatCard({ icon: Icon, label, value, trend, trendUp, gradient }
           </div>
         </div>
         <p className={`text-xs mt-2 flex items-center gap-1 ${trendUp ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-          {trendUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />} {trend} this month
+          {trendUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />} {trend}
         </p>
       </CardContent>
     </Card>
   );
 }
 
-function BusinessManagementCard({ business, onRefresh }: { business: Business; onRefresh: () => void }) {
+function BusinessManagementCard({ business, onRefresh, onEdit, onDelete }: {
+  business: Business; onRefresh: () => void; onEdit: (id: string) => void; onDelete: (id: string) => void;
+}) {
   const { setView } = useAppStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [showProducts, setShowProducts] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const statusStyle = BIZ_STATUS_STYLES[business.status as BusinessStatus] || BIZ_STATUS_STYLES.APPROVED;
+  const StatusIcon = statusStyle.icon;
 
   useEffect(() => {
     if (showProducts) {
@@ -515,26 +537,63 @@ function BusinessManagementCard({ business, onRefresh }: { business: Business; o
     } catch { toast.error('Failed'); }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await onDelete(business.id);
+      setDeleteOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Card className="border-border/50">
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
-          <div>
-            <h3 className="font-semibold">{business.name}</h3>
-            <div className="flex gap-1.5 mt-1.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-base">{business.name}</h3>
               <Badge variant="outline" className="text-[10px]">{business.type}</Badge>
-              {business.isVerified && <Badge variant="secondary" className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Verified</Badge>}
+              {business.isVerified && (
+                <Badge variant="secondary" className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Verified</Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="secondary" className={`${statusStyle.class} gap-1 text-[10px] border`}>
+                <StatusIcon className="h-3 w-3" /> {statusStyle.label}
+              </Badge>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setView('business-detail', business.id)}>
-            View
-          </Button>
+          <div className="flex gap-1.5 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => setView('business-detail', business.id)}>
+              View
+            </Button>
+          </div>
         </div>
-        <div className="mt-4 flex gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setShowProducts(!showProducts)}>
-            <Package className="h-3.5 w-3.5 mr-1" /> {showProducts ? 'Hide' : 'Products'}
-          </Button>
+
+        {/* Rejection Reason */}
+        {business.status === 'REJECTED' && business.rejectionReason && (
+          <Alert variant="destructive" className="mt-3">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle className="text-xs">Rejection Reason</AlertTitle>
+            <AlertDescription className="text-xs">{business.rejectionReason}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {business.status !== 'REJECTED' && (
+            <Button variant="secondary" size="sm" onClick={() => setShowProducts(!showProducts)}>
+              <Package className="h-3.5 w-3.5 mr-1" /> {showProducts ? 'Hide' : 'Products'}
+            </Button>
+          )}
           <ProductFormDialog businessId={business.id} onAdd={(p) => setProducts((prev) => [...prev, p])} />
+          <Button variant="outline" size="sm" onClick={() => onEdit(business.id)}>
+            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+          </Button>
+          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
 
         {showProducts && (
@@ -561,92 +620,25 @@ function BusinessManagementCard({ business, onRefresh }: { business: Business; o
           </div>
         )}
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Business</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{business.name}&quot;? This action cannot be undone. All products, images, and hours will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1.5" /> Delete</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
-  );
-}
-
-function BusinessFormDialog({ categories, localities, onRefresh }: { categories: Category[]; localities: Locality[]; onRefresh: () => void }) {
-  const { user } = useAppStore();
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [type, setType] = useState('BUSINESS');
-  const [categoryId, setCategoryId] = useState('');
-  const [localityId, setLocalityId] = useState('');
-  const [address, setAddress] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [cats, setCats] = useState(categories);
-  const [locs, setLocs] = useState(localities);
-
-  useEffect(() => {
-    if (open && cats.length === 0) {
-      api.get<{ categories: Category[] }>('/api/categories').then((r) => setCats(r.categories || [])).catch(() => {});
-      api.get<{ localities: Locality[] }>('/api/localities').then((r) => setLocs(r.localities || [])).catch(() => {});
-    }
-  }, [open]);
-
-  const handleSubmit = async () => {
-    if (!name.trim() || !categoryId || !localityId) { toast.error('Fill required fields'); return; }
-    setLoading(true);
-    try {
-      await api.post('/api/businesses', { name, description, type, categoryId, localityId, address, phone, email, ownerId: user?.id });
-      toast.success('Business created!');
-      setOpen(false); setName(''); setDescription(''); setAddress(''); setPhone(''); setEmail('');
-      onRefresh();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed');
-    } finally { setLoading(false); }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> Add Business</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Add New Business</DialogTitle></DialogHeader>
-        <div className="space-y-3 pt-2">
-          <div><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
-          <div><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" rows={3} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Type *</Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BUSINESS">Business</SelectItem>
-                  <SelectItem value="AMENITY">Amenity</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Category *</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>{cats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label>Locality *</Label>
-            <Select value={localityId} onValueChange={setLocalityId}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
-              <SelectContent>{locs.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div><Label>Address</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Phone</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1" /></div>
-            <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1" /></div>
-          </div>
-          <Button onClick={handleSubmit} className="w-full" disabled={loading}>
-            {loading ? 'Creating...' : 'Create Business'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -655,6 +647,7 @@ function ProductFormDialog({ businessId, onAdd }: { businessId: string; onAdd: (
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [priceUnit, setPriceUnit] = useState('');
   const [type, setType] = useState('PRODUCT');
   const [loading, setLoading] = useState(false);
 
@@ -662,10 +655,12 @@ function ProductFormDialog({ businessId, onAdd }: { businessId: string; onAdd: (
     if (!name.trim()) return;
     setLoading(true);
     try {
-      const p = await api.post<Product>(`/api/businesses/${businessId}/products`, { name, description, price, type });
+      const p = await api.post<Product>(`/api/businesses/${businessId}/products`, {
+        name, description, price, priceUnit, type,
+      });
       toast.success('Product added!');
       onAdd(p);
-      setOpen(false); setName(''); setDescription(''); setPrice('');
+      setOpen(false); setName(''); setDescription(''); setPrice(''); setPriceUnit('');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed');
     } finally { setLoading(false); }
@@ -681,8 +676,9 @@ function ProductFormDialog({ businessId, onAdd }: { businessId: string; onAdd: (
         <div className="space-y-3 pt-2">
           <div><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
           <div><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" rows={2} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Price</Label><Input value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" placeholder="e.g. ₹500" /></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div><Label>Price</Label><Input value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" placeholder="₹500" /></div>
+            <div><Label>Unit</Label><Input value={priceUnit} onChange={(e) => setPriceUnit(e.target.value)} className="mt-1" placeholder="per pc" /></div>
             <div>
               <Label>Type</Label>
               <Select value={type} onValueChange={setType}>

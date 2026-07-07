@@ -24,11 +24,12 @@ import {
   Users, Building2, MessageSquare, FolderTree, Map, Plus, Pencil, Trash2,
   ShieldCheck, Star, Eye, CheckCircle2, Clock, XCircle, ArrowLeft,
   TrendingUp, TrendingDown, Shield, Inbox, UserCog, MessageCircle, Settings,
+  Check, AlertCircle, Loader2,
 } from 'lucide-react';
 import { ChatPanel } from './ChatPanel';
 import { UserManagement } from './UserManagement';
 import { SiteSettingsPage } from './SiteSettingsPage';
-import type { DashboardStats, Category, Locality, Business, BusinessWithRelations, User as UserType, EnquiryWithRelations } from '@/types';
+import type { DashboardStats, Category, Locality, Business, BusinessWithRelations, User as UserType, EnquiryWithRelations, BusinessStatus } from '@/types';
 
 const STATUS_STYLES: Record<string, { class: string; icon: React.ElementType }> = {
   OPEN: { class: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
@@ -186,8 +187,16 @@ export function AdminDashboard() {
           </div>
         )}
 
-        <Tabs defaultValue="enquiries" className="w-full">
+        <Tabs defaultValue="pending" className="w-full">
           <TabsList className="flex-wrap h-auto gap-1 bg-muted p-1 rounded-lg">
+            <TabsTrigger value="pending" className="gap-1.5 text-xs sm:text-sm relative">
+              <Clock className="h-4 w-4" /> Pending
+              {businesses.filter((b) => b.status === 'PENDING').length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
+                  {businesses.filter((b) => b.status === 'PENDING').length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="enquiries" className="gap-1.5 text-xs sm:text-sm"><MessageSquare className="h-4 w-4" /> Enquiries</TabsTrigger>
             <TabsTrigger value="businesses" className="gap-1.5 text-xs sm:text-sm"><Building2 className="h-4 w-4" /> Businesses</TabsTrigger>
             <TabsTrigger value="categories" className="gap-1.5 text-xs sm:text-sm"><FolderTree className="h-4 w-4" /> Categories</TabsTrigger>
@@ -195,6 +204,11 @@ export function AdminDashboard() {
             <TabsTrigger value="users" className="gap-1.5 text-xs sm:text-sm"><Users className="h-4 w-4" /> Users</TabsTrigger>
             <TabsTrigger value="settings" className="gap-1.5 text-xs sm:text-sm"><Settings className="h-4 w-4" /> Settings</TabsTrigger>
           </TabsList>
+
+          {/* Pending Approvals Tab */}
+          <TabsContent value="pending" className="mt-6">
+            <PendingApprovalsSection businesses={businesses} onRefresh={refresh} />
+          </TabsContent>
 
           {/* Enquiries Tab */}
           <TabsContent value="enquiries" className="mt-6">
@@ -520,6 +534,178 @@ function LocalityManager({ localities, onRefresh, onDelete }: {
             ))}
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PendingApprovalsSection({ businesses, onRefresh }: { businesses: BusinessWithRelations[]; onRefresh: () => void }) {
+  const { setView } = useAppStore();
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const pendingBusinesses = businesses.filter((b) => b.status === 'PENDING');
+
+  const handleApprove = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await api.put(`/api/businesses/${id}`, { status: 'APPROVED', isActive: true });
+      toast.success('Business approved! It is now live.');
+      onRefresh();
+    } catch {
+      toast.error('Failed to approve business');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    if (!rejectReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+    setActionLoading(id);
+    try {
+      await api.put(`/api/businesses/${id}`, { status: 'REJECTED', rejectionReason: rejectReason.trim() });
+      toast.success('Business rejected. The owner will be notified.');
+      setRejectingId(null);
+      setRejectReason('');
+      onRefresh();
+    } catch {
+      toast.error('Failed to reject business');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  if (pendingBusinesses.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500" /> Pending Approvals
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="py-12 text-center">
+          <div className="p-4 rounded-full bg-emerald-100 dark:bg-emerald-900/20 w-fit mx-auto mb-4">
+            <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <p className="text-muted-foreground font-medium">All caught up!</p>
+          <p className="text-sm text-muted-foreground/70 mt-1">No pending businesses to review.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Clock className="h-5 w-5 text-amber-500" /> Pending Approvals
+          <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ml-1">
+            {pendingBusinesses.length}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3 max-h-[500px] overflow-y-auto">
+          {pendingBusinesses.map((biz) => (
+            <div key={biz.id} className="p-4 rounded-xl border border-border/50 hover:border-amber-300 dark:hover:border-amber-700 transition-colors bg-amber-50/30 dark:bg-amber-900/5">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3
+                      className="font-semibold text-base cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => setView('business-detail', biz.id)}
+                    >
+                      {biz.name}
+                    </h3>
+                    <Badge variant="outline" className="text-[10px]">{biz.type}</Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <FolderTree className="h-3.5 w-3.5" />
+                      {biz.category?.name || '-'}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Map className="h-3.5 w-3.5" />
+                      {biz.locality?.name || '-'}
+                    </span>
+                    {biz.owner && (
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3.5 w-3.5" />
+                        {biz.owner.name} ({biz.owner.email})
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Submitted {new Date(biz.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => handleApprove(biz.id)}
+                    disabled={actionLoading === biz.id}
+                  >
+                    {actionLoading === biz.id && rejectingId !== biz.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <><Check className="h-4 w-4 mr-1" /> Approve</>
+                    )}
+                  </Button>
+                  {rejectingId === biz.id ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="Rejection reason..."
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        className="h-9 w-48"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleReject(biz.id);
+                          if (e.key === 'Escape') { setRejectingId(null); setRejectReason(''); }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleReject(biz.id)}
+                        disabled={actionLoading === biz.id}
+                      >
+                        {actionLoading === biz.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Confirm'
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => { setRejectingId(null); setRejectReason(''); }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setRejectingId(biz.id)}
+                      disabled={actionLoading === biz.id}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" /> Reject
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
