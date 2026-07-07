@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User, Category, Locality } from '@/types';
+import type { User, Category, Locality, SiteSettings } from '@/types';
 import { api } from '@/lib/api';
 
 export type ViewType =
@@ -37,6 +37,7 @@ interface AppState {
   // Shared Data
   categories: Category[];
   localities: Locality[];
+  siteSettings: SiteSettings | null;
   sharedDataLoaded: boolean;
 
   // Actions
@@ -50,6 +51,8 @@ interface AppState {
   closeMobileMenu: () => void;
   initializeAuth: () => Promise<void>;
   loadSharedData: () => Promise<void>;
+  loadSettings: () => Promise<void>;
+  setSiteSettings: (settings: SiteSettings) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -72,6 +75,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Shared Data
   categories: [],
   localities: [],
+  siteSettings: null,
   sharedDataLoaded: false,
 
   // Actions
@@ -119,6 +123,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ sharedDataLoaded: true });
     }
   },
+
+  loadSettings: async () => {
+    try {
+      const res = await api.get<{ settings: SiteSettings }>('/api/settings');
+      set({ siteSettings: res.settings });
+    } catch {
+      // Use defaults
+    }
+  },
+
+  setSiteSettings: (settings) => set({ siteSettings: settings }),
 
   initializeAuth: async () => {
     const token = localStorage.getItem('citydir_token');

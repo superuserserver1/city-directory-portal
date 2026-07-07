@@ -129,3 +129,27 @@ export interface DashboardStats {
   totalLocalities: number;
   recentEnquiries: EnquiryWithRelations[];
 }
+
+export interface SiteSettings {
+  id: string;
+  cityName: string;
+  siteName: string;
+  tagline: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroCtaText: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  twitterUrl: string | null;
+  websiteUrl: string | null;
+  footerText: string;
+  copyrightText: string;
+  primaryColor: string;
+  accentColor: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  updatedAt: string;
+  createdAt: string;
+}

@@ -72,11 +72,12 @@ function EditBusinessWrapper() {
 }
 
 function AppContent() {
-  const { currentView, user, initializeAuth, loadSharedData } = useAppStore();
+  const { currentView, user, initializeAuth, loadSharedData, loadSettings } = useAppStore();
 
   useEffect(() => {
     initializeAuth();
     loadSharedData();
+    loadSettings();
     api.get('/api/seed').catch(() => {});
   }, []);
 

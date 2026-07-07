@@ -6,7 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
 export function Footer() {
-  const { setView, categories, localities } = useAppStore();
+  const { setView, categories, localities, siteSettings } = useAppStore();
+  const siteName = siteSettings?.siteName || 'CityDir';
+  const cityName = siteSettings?.cityName || 'the city';
+  const copyrightText = siteSettings?.copyrightText || 'CityDir';
+  const footerText = siteSettings?.footerText || 'Your complete city directory. Discover businesses, amenities, and services all in one place.';
+  const contactEmail = siteSettings?.contactEmail || 'info@citydir.com';
+  const contactPhone = siteSettings?.contactPhone || '+91 98765 43210';
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -23,20 +29,20 @@ export function Footer() {
                 <MapPin className="h-5 w-5 text-primary-foreground" />
               </div>
               <span className="text-xl font-bold">
-                City<span className="text-primary">Dir</span>
+                {siteName.length > 3 ? (<>{siteName.substring(0, siteName.length - 3)}<span className="text-primary">{siteName.slice(-3)}</span></>) : (<span className="text-primary">{siteName}</span>)}
               </span>
             </div>
             <p className="text-sm text-background/60 leading-relaxed mb-4 max-w-xs">
-              Your complete city directory. Discover businesses, amenities, and services all in one place.
+              {footerText}
             </p>
             <div className="space-y-2">
               <div className="flex items-center gap-3 text-sm text-background/50">
                 <Phone className="h-4 w-4 shrink-0" />
-                <span>+91 98765 43210</span>
+                <span>{contactPhone}</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-background/50">
                 <Mail className="h-4 w-4 shrink-0" />
-                <span>info@citydir.com</span>
+                <span>{contactEmail}</span>
               </div>
             </div>
           </div>
@@ -128,11 +134,11 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-background/40 text-center sm:text-left">
-            &copy; {new Date().getFullYear()} CityDir. All rights reserved.
+            &copy; {new Date().getFullYear()} {copyrightText}. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <p className="text-xs text-background/40 flex items-center gap-1">
-              Made with <Heart className="h-3 w-3 text-red-500 fill-red-500" /> for the city
+              Made with <Heart className="h-3 w-3 text-red-500 fill-red-500" /> for {cityName}
             </p>
             <Button
               variant="ghost"

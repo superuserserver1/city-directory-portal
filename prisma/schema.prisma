@@ -171,3 +171,27 @@ model Review {
   @@index([userId])
   @@index([businessId])
 }
+
+model SiteSettings {
+  id            String   @id @default("default")
+  cityName      String   @default("Our City")
+  siteName      String   @default("CityDir")
+  tagline       String   @default("Your Complete City Directory")
+  heroTitle     String   @default("Discover {city} — All in One Place")
+  heroSubtitle  String   @default("Find the best businesses, amenities, restaurants, hospitals, schools, and services across {city}.")
+  heroCtaText   String   @default("Register as Business Owner")
+  contactEmail  String?
+  contactPhone  String?
+  facebookUrl   String?
+  instagramUrl  String?
+  twitterUrl    String?
+  websiteUrl    String?
+  footerText    String   @default("Your complete city directory. Discover businesses, amenities, and services all in one place.")
+  copyrightText String   @default("CityDir")
+  primaryColor  String   @default("")
+  accentColor   String   @default("")
+  logoUrl       String?
+  faviconUrl    String?
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}

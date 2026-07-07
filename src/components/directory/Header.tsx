@@ -24,10 +24,12 @@ import {
 
 export function Header() {
   const {
-    currentView, user, isAuthenticated, searchQuery,
+    currentView, user, isAuthenticated, searchQuery, siteSettings,
     setView, setSearchQuery, logout, toggleMobileMenu,
     categories, localities,
   } = useAppStore();
+  const siteName = siteSettings?.siteName || 'CityDir';
+  const cityName = siteSettings?.cityName || 'Our City';
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [suggestions, setSuggestions] = useState<{ id: string; name: string; type: string; rating: number; category: string; locality: string; price?: string; productType?: string }[]>([]);
@@ -102,7 +104,7 @@ export function Header() {
                 <MapPin className="h-5 w-5 text-white" />
               </div>
               <span className="text-xl font-bold tracking-tight text-foreground">
-                City<span className="text-primary">Dir</span>
+                {siteName.length > 3 ? (<>{siteName.substring(0, siteName.length - 3)}<span className="text-primary">{siteName.slice(-3)}</span></>) : (<span className="text-primary">{siteName}</span>)}
               </span>
             </button>
 
@@ -378,7 +380,7 @@ export function Header() {
             <>
               <SheetHeader className="gradient-hero !p-6 !pb-5">
                 <SheetTitle className="text-white text-xl flex items-center gap-2">
-                  <MapPin className="h-5 w-5" /> CityDir
+                  <MapPin className="h-5 w-5" /> {siteName}
                 </SheetTitle>
                 <SheetDescription className="text-white/70">Your complete city directory</SheetDescription>
               </SheetHeader>

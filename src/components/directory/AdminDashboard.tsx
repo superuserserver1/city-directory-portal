@@ -23,10 +23,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Users, Building2, MessageSquare, FolderTree, Map, Plus, Pencil, Trash2,
   ShieldCheck, Star, Eye, CheckCircle2, Clock, XCircle, ArrowLeft,
-  TrendingUp, TrendingDown, Shield, Inbox, UserCog, MessageCircle,
+  TrendingUp, TrendingDown, Shield, Inbox, UserCog, MessageCircle, Settings,
 } from 'lucide-react';
 import { ChatPanel } from './ChatPanel';
 import { UserManagement } from './UserManagement';
+import { SiteSettingsPage } from './SiteSettingsPage';
 import type { DashboardStats, Category, Locality, Business, BusinessWithRelations, User as UserType, EnquiryWithRelations } from '@/types';
 
 const STATUS_STYLES: Record<string, { class: string; icon: React.ElementType }> = {
@@ -192,6 +193,7 @@ export function AdminDashboard() {
             <TabsTrigger value="categories" className="gap-1.5 text-xs sm:text-sm"><FolderTree className="h-4 w-4" /> Categories</TabsTrigger>
             <TabsTrigger value="localities" className="gap-1.5 text-xs sm:text-sm"><Map className="h-4 w-4" /> Localities</TabsTrigger>
             <TabsTrigger value="users" className="gap-1.5 text-xs sm:text-sm"><Users className="h-4 w-4" /> Users</TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1.5 text-xs sm:text-sm"><Settings className="h-4 w-4" /> Settings</TabsTrigger>
           </TabsList>
 
           {/* Enquiries Tab */}
@@ -322,6 +324,11 @@ export function AdminDashboard() {
           {/* Users Tab */}
           <TabsContent value="users" className="mt-6">
             <UserManagement />
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="mt-6">
+            <SiteSettingsPage />
           </TabsContent>
         </Tabs>
       </div>
